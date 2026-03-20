@@ -12,18 +12,28 @@ interface Props {
 
 function KnockDots({ filled, total }: { filled: number; total: number }) {
   return (
-    <div style={{ display: 'flex', gap: 3 }}>
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          style={{
-            width: 6, height: 6,
-            borderRadius: '50%',
-            background: i < filled ? 'var(--text-primary)' : 'transparent',
-            border: `1px solid ${i < filled ? 'var(--text-primary)' : 'var(--border-bright)'}`,
-          }}
-        />
-      ))}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 9, height: 9,
+              borderRadius: '50%',
+              background: i < filled ? '#ffffff' : 'transparent',
+              border: `1.5px solid ${i < filled ? '#ffffff' : 'var(--border-bright)'}`,
+            }}
+          />
+        ))}
+      </div>
+      <span style={{
+        fontSize: 9,
+        fontFamily: 'var(--font-jetbrains-mono), monospace',
+        color: filled > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+        letterSpacing: '0.03em',
+      }}>
+        {filled}/{total}
+      </span>
     </div>
   );
 }
@@ -96,12 +106,20 @@ export default function PlayerSlot({ player, knockTarget, isMe, isActiveTurn, ch
       </div>
 
       {/* Balance */}
-      <div style={{
-        fontSize: 13, fontFamily: 'var(--font-jetbrains-mono), monospace',
-        color: player.balance >= 0 ? 'var(--text-secondary)' : 'var(--text-muted)',
-        fontWeight: 500,
-      }}>
-        {player.balance >= 0 ? '+' : ''}{player.balance}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+        <div style={{
+          fontSize: 13, fontFamily: 'var(--font-jetbrains-mono), monospace',
+          color: player.balance >= 0 ? '#ffffff' : '#666666',
+          fontWeight: 500,
+        }}>
+          {player.balance >= 0 ? '+$' : '-$'}{Math.abs(player.balance)}
+        </div>
+        <div style={{
+          fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase',
+          color: 'var(--text-muted)', fontFamily: 'var(--font-outfit), sans-serif',
+        }}>
+          Balance
+        </div>
       </div>
 
       {/* Knock dots */}

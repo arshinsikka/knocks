@@ -35,6 +35,8 @@ export default function Card({ card, totalCards = 1, index = 0, mini = false }: 
     : (SIZES[Math.min(totalCards, 5) as keyof typeof SIZES] ?? SIZES[5]);
 
   const delayMs = index * 100;
+  const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+  const suitColor = isRed ? '#dc2626' : 'var(--card-text)';
 
   return (
     <div
@@ -47,7 +49,7 @@ export default function Card({ card, totalCards = 1, index = 0, mini = false }: 
         boxShadow:   '0 2px 4px rgba(0,0,0,0.3)',
         borderRadius: 4,
         animationDelay: `${delayMs}ms`,
-        color: 'var(--card-text)',
+        color: suitColor,
         fontFamily: 'var(--font-jetbrains-mono), monospace',
       }}
     >

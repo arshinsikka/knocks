@@ -93,13 +93,13 @@ export default function StatusBar({ roomCode, orbit, round, potTotal, payout, se
         <span style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
           POT&nbsp;
           <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-            {potTotal}
+            ${potTotal}
           </span>
         </span>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-          WIN&nbsp;
+          PAYOUT&nbsp;
           <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-            {payout}
+            ${payout}
           </span>
         </span>
       </div>
