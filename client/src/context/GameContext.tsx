@@ -26,10 +26,11 @@ export interface ShowdownParticipant {
 
 export interface ShowdownData {
   participants: ShowdownParticipant[];
-  winner: string;
+  winner: string | null;
   payout: number;
   eachLoserPays: number;
   isPublic: boolean;
+  tie: boolean;
 }
 
 export interface GameOverData {
@@ -136,7 +137,9 @@ export function GameProvider({
         gamePhase: 'PLAYING', orbit: d.orbit, round: d.round,
         knockTarget: d.knockTarget, potTotal: d.potTotal, payout: d.payout,
         players: d.players, myCards: [], isMyTurn: false, turnPhase: null,
-        waitingFor: null, showdownData: null, latestKnock: null,
+        waitingFor: null, latestKnock: null,
+        // showdownData intentionally NOT cleared here — the overlay manages
+        // its own 6-second lifecycle and dismisses independently via dismissShowdown.
         serverPhase: 'IN_OUT', playerChoices: {},
       });
       addLog(`Orbit ${d.orbit} · Round ${d.round} — ${d.startingPlayerName} goes first`);
@@ -181,21 +184,22 @@ export function GameProvider({
 
     const onShowdownReveal = (d: {
       participants: ShowdownParticipant[];
-      winner: string; payout: number; eachLoserPays: number;
+      winner: string | null; payout: number; eachLoserPays: number; tie?: boolean;
     }) => patch({
       isMyTurn: false, turnPhase: null,
-      showdownData: { ...d, isPublic: false }, serverPhase: 'SHOWDOWN',
+      showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
+      serverPhase: 'SHOWDOWN',
     });
 
     const onShowdownPublic = (d: {
-      participantNames: string[]; winnerName: string;
-      payout: number; eachLoserPays: number;
+      participantNames: string[]; winnerName: string | null;
+      payout: number; eachLoserPays: number; tie?: boolean;
     }) => patch({
       isMyTurn: false, turnPhase: null,
       showdownData: {
         participants: d.participantNames.map((name) => ({ name, cards: [], handType: '' })),
         winner: d.winnerName, payout: d.payout,
-        eachLoserPays: d.eachLoserPays, isPublic: true,
+        eachLoserPays: d.eachLoserPays, isPublic: true, tie: d.tie ?? false,
       },
       serverPhase: 'SHOWDOWN',
     });

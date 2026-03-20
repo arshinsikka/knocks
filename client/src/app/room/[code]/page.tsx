@@ -143,6 +143,7 @@ function GameBoard({ roomCode }: { roomCode: string }) {
         <ShowdownToast
           winnerName={showdownData.winner}
           payout={showdownData.payout}
+          tie={showdownData.tie}
           onClose={dismissShowdown}
         />
       )}

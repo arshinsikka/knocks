@@ -8,10 +8,11 @@ export interface RoundSummary {
   round: number;
   orbit: number;
   participants: Array<{ playerId: string; hand: ClassifiedHand }>;
-  winner: string | null;     // playerId, null = no participants
+  winner: string | null;     // playerId, null = no participants or tie
   payout: number;
   knockAwarded: boolean;
   newKnocks: Record<string, number>;
+  tie: boolean;
 }
 
 export interface GameRoomState {
@@ -230,16 +231,22 @@ export class GameRoom {
         s.round,
         s.allDealtCards,
       );
-      winner = result.winner;
-      payout = calculatePayout(s.round, s.potTotal);
-      settleShowdown(winner, result.losers, payout);
-      // Track showdown breakdown stats (knock is NOT awarded here)
-      winner.showdownWinnings += payout;
-      const loserShare = result.losers.length > 0 ? payout / result.losers.length : 0;
-      for (const loser of result.losers) {
-        loser.showdownLosses -= loserShare;
+      if (!result.tie) {
+        // Clear winner — settle balances
+        winner = result.winner;
+        payout = calculatePayout(s.round, s.potTotal);
+        settleShowdown(winner!, result.losers, payout);
+        // Track showdown breakdown stats
+        winner!.showdownWinnings += payout;
+        const loserShare = result.losers.length > 0 ? payout / result.losers.length : 0;
+        for (const loser of result.losers) {
+          loser.showdownLosses -= loserShare;
+        }
       }
+      // If tie: winner=null, payout=0, no balance changes
     }
+
+    const tie = winner === null && participants.length >= 2;
 
     const summary: RoundSummary = {
       round: s.round,
@@ -252,6 +259,7 @@ export class GameRoom {
       payout,
       knockAwarded,
       newKnocks,
+      tie,
     };
 
     s.lastSummary = summary;

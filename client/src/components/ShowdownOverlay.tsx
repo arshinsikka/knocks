@@ -66,7 +66,7 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
         {/* Participants */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
           {data.participants.map((p) => {
-            const isWinner = p.name === data.winner;
+            const isWinner = !data.tie && p.name === data.winner;
             return (
               <div
                 key={p.name}
@@ -123,7 +123,16 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
           borderTop: '1px solid var(--border-subtle)',
           paddingTop: 16, textAlign: 'center',
         }}>
-          {!data.isPublic ? (
+          {data.tie ? (
+            <p style={{
+              fontSize: 15, fontWeight: 700,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              marginBottom: 4,
+            }}>
+              TIE — No payout
+            </p>
+          ) : !data.isPublic ? (
             <p style={{
               fontSize: 15, fontWeight: 700,
               color: amIWinner ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -131,17 +140,17 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
               marginBottom: 4,
             }}>
               {amIWinner
-                ? `+${data.payout} collected`
-                : `-${data.eachLoserPays} paid`}
+                ? `+$${data.payout} collected`
+                : `-$${data.eachLoserPays} paid`}
             </p>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              {data.winner} wins the showdown (+{data.payout})
+              {data.winner} wins the showdown (+${data.payout})
             </p>
           )}
-          {data.participants.length > 2 && (
+          {!data.tie && data.participants.length > 2 && (
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              {data.participants.length - 1} losers &times; {data.eachLoserPays} each
+              {data.participants.length - 1} losers &times; ${data.eachLoserPays} each
             </p>
           )}
         </div>
@@ -160,15 +169,16 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
 
 /** Small toast for non-participants */
 export function ShowdownToast({
-  winnerName, payout, onClose,
-}: { winnerName: string; payout: number; onClose: () => void }) {
+  winnerName, payout, tie, onClose,
+}: { winnerName: string | null; payout: number; tie?: boolean; onClose: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 3000);
+    const t = setTimeout(onClose, 6000);
     return () => clearTimeout(t);
   }, [onClose]);
 
   return (
     <div
+      onClick={onClose}
       className="knock-banner"
       style={{
         position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
@@ -180,9 +190,10 @@ export function ShowdownToast({
         letterSpacing: '0.05em',
         zIndex: 55,
         whiteSpace: 'nowrap',
+        cursor: 'pointer',
       }}
     >
-      {winnerName} won the showdown (+{payout})
+      {tie ? 'Showdown tied — no payout' : `${winnerName} won the showdown (+$${payout})`}
     </div>
   );
 }
