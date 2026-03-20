@@ -10,7 +10,8 @@
       "Bash(git push:*)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(npx jest:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(grep:*)"
     ]
   }
 }

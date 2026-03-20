@@ -62,7 +62,7 @@ function PlayerRing() {
 
 // ── Game Board ────────────────────────────────────────────────────────────────
 
-function GameBoard({ roomCode }: { roomCode: string }) {
+function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
   const {
     orbit, round, potTotal, payout, knockTarget,
     players, myCards, myId,
@@ -73,6 +73,7 @@ function GameBoard({ roomCode }: { roomCode: string }) {
   } = useGame();
 
   const myName = players.find((p) => p.id === myId)?.name ?? '';
+  const isHost = myId === hostId;
 
   // ── Sound effects (all hooks before early return — React rules) ─────────────
 
@@ -125,7 +126,7 @@ function GameBoard({ roomCode }: { roomCode: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameOver]);
 
-  if (gameOver) return <GameOverScreen data={gameOver} />;
+  if (gameOver) return <GameOverScreen data={gameOver} roomCode={roomCode} isHost={isHost} />;
 
   return (
     <div style={{
@@ -214,6 +215,7 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
   const [players,  setPlayers]  = useState<LobbyPlayer[]>(session.players);
   const [hostId,   setHostId]   = useState(session.hostId);
   const [copied,   setCopied]   = useState(false);
+  const [shared,   setShared]   = useState(false);
   const [error,    setError]    = useState('');
   const socket = getSocket();
   const myId   = socket.id ?? '';
@@ -243,6 +245,23 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }, [code]);
+
+  const shareLink = `https://knocks.vercel.app/join/${code}`;
+  const share = useCallback(async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: 'Join my Knocks game', url: shareLink });
+      } else {
+        await navigator.clipboard.writeText(shareLink);
+        setShared(true);
+        setTimeout(() => setShared(false), 1800);
+      }
+    } catch {
+      await navigator.clipboard.writeText(shareLink);
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    }
+  }, [shareLink]);
 
   return (
     <div style={{
@@ -284,6 +303,28 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
           <p style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
             Share this code with your friends
           </p>
+
+          {/* Share link button */}
+          <button
+            onClick={share}
+            style={{
+              marginTop: 10,
+              background: 'none',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 6,
+              padding: '8px 20px',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: shared ? 'var(--text-secondary)' : 'var(--text-muted)',
+              transition: 'color 150ms ease, border-color 150ms ease',
+              fontFamily: 'var(--font-outfit), sans-serif',
+            }}
+          >
+            {shared ? 'Link Copied!' : 'Share Link'}
+          </button>
         </div>
 
         {/* Knock target pill */}
@@ -428,9 +469,23 @@ export default function RoomPage() {
     socket.emit('rejoin_game', { roomCode: code, playerName: parsed.playerName });
     const onSnapshot = () => setGameStarted(true);
     socket.on('state_snapshot', onSnapshot);
+
+    const onRematchStarted = (d: { players: LobbyPlayer[]; hostId: string; knockTarget: number }) => {
+      setSession((prev) => prev ? { ...prev, players: d.players, hostId: d.hostId } : null);
+      const s = sessionStorage.getItem('knocks_session');
+      if (s) {
+        sessionStorage.setItem('knocks_session', JSON.stringify({
+          ...JSON.parse(s), players: d.players, hostId: d.hostId,
+        }));
+      }
+      setGameStarted(false);
+    };
+    socket.on('rematch_started', onRematchStarted);
+
     return () => {
       socket.off('game_started', onGameStarted);
       socket.off('state_snapshot', onSnapshot);
+      socket.off('rematch_started', onRematchStarted);
     };
   }, [code, router]);
 
@@ -443,7 +498,7 @@ export default function RoomPage() {
   return (
     <GameProvider knockTarget={session.knockTarget} roomCode={code}>
       <ReconnectBanner roomCode={code} playerName={session.playerName} />
-      <GameBoard roomCode={code} />
+      <GameBoard roomCode={code} hostId={session.hostId} />
     </GameProvider>
   );
 }

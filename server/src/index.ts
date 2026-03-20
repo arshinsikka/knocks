@@ -635,6 +635,26 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
+  // ── LOBBY: request_rematch ─────────────────────────────────────────────────
+  socket.on('request_rematch', ({ roomCode }: { roomCode: string }) => {
+    const room = rooms.get(roomCode);
+    if (!room) { socket.emit('error', { message: 'Room not found' }); return; }
+    if (room.hostId !== socket.id) { socket.emit('error', { message: 'Only the host can start a rematch' }); return; }
+
+    clearTurnTimer(roomCode);
+    activeGames.delete(roomCode);
+    room.gameStarted = false;
+    room.lastActivity = Date.now();
+
+    io.to(roomCode).emit('rematch_started', {
+      players: room.players,
+      hostId: room.hostId,
+      knockTarget: room.knockTarget,
+    });
+
+    console.log(`[room] REMATCH started in ${roomCode}`);
+  });
+
   // ── disconnect ───────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`[-] ${socket.id}`);

@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameOverData } from '@/context/GameContext';
+import { getSocket } from '@/lib/socket';
 
 interface Props {
   data: GameOverData;
+  roomCode: string;
+  isHost: boolean;
 }
 
 // Sparse particle dots — CSS only, no JS animation
@@ -101,8 +105,14 @@ function Row({ label, value, note }: { label: string; value: number; note?: stri
   );
 }
 
-export default function GameOverScreen({ data }: Props) {
+export default function GameOverScreen({ data, roomCode, isHost }: Props) {
   const router = useRouter();
+  const [rematchPending, setRematchPending] = useState(false);
+
+  const handleRematch = () => {
+    setRematchPending(true);
+    getSocket().emit('request_rematch', { roomCode });
+  };
   const sorted = [...data.finalBalances].sort((a, b) => b.balance - a.balance);
 
   return (
@@ -215,6 +225,39 @@ export default function GameOverScreen({ data }: Props) {
             </div>
           );
         })}
+
+        {/* Rematch */}
+        {isHost ? (
+          <button
+            onClick={handleRematch}
+            disabled={rematchPending}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              padding: '14px 0',
+              fontSize: 13, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              background: rematchPending ? 'var(--bg-elevated)' : 'var(--border-medium)',
+              border: `1px solid ${rematchPending ? 'var(--border-medium)' : 'var(--border-bright)'}`,
+              borderRadius: 8,
+              color: rematchPending ? 'var(--text-muted)' : 'var(--text-primary)',
+              cursor: rematchPending ? 'not-allowed' : 'pointer',
+              opacity: rematchPending ? 0.5 : 1,
+              transition: 'all 150ms ease-out',
+              fontFamily: 'var(--font-outfit), sans-serif',
+            }}
+          >
+            {rematchPending ? 'Starting\u2026' : 'Rematch'}
+          </button>
+        ) : (
+          <p className="waiting-pulse" style={{
+            marginTop: 12, textAlign: 'center', fontSize: 11,
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+          }}>
+            Waiting for host to start rematch&hellip;
+          </p>
+        )}
 
         {/* Back home */}
         <button
