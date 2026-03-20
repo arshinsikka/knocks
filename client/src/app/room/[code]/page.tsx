@@ -371,7 +371,9 @@ export default function RoomPage() {
     const socket = getSocket();
     const onGameStarted = () => setGameStarted(true);
     socket.on('game_started', onGameStarted);
-    socket.emit('request_state', { roomCode: code });
+    // Attempt to rejoin an active game (handles page refresh mid-game).
+    // Silent no-op on the server if no game has started yet.
+    socket.emit('rejoin_game', { roomCode: code, playerName: parsed.playerName });
     const onSnapshot = () => setGameStarted(true);
     socket.on('state_snapshot', onSnapshot);
     return () => {
@@ -387,7 +389,7 @@ export default function RoomPage() {
   }
 
   return (
-    <GameProvider knockTarget={session.knockTarget}>
+    <GameProvider knockTarget={session.knockTarget} roomCode={code}>
       <ReconnectBanner roomCode={code} playerName={session.playerName} />
       <GameBoard roomCode={code} />
     </GameProvider>

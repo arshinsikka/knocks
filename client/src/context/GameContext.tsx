@@ -102,7 +102,8 @@ const GameContext = createContext<GameContextValue>({
 export function GameProvider({
   children,
   knockTarget,
-}: { children: ReactNode; knockTarget: number }) {
+  roomCode,
+}: { children: ReactNode; knockTarget: number; roomCode: string }) {
   const [state, setState] = useState<GameState>({ ...DEFAULT, knockTarget });
 
   const patch = useCallback((p: Partial<GameState>) =>
@@ -207,12 +208,15 @@ export function GameProvider({
     };
 
     const onStateSnapshot = (d: {
-      orbit: number; round: number; potTotal: number;
+      orbit: number; round: number; potTotal: number; payout?: number;
       phase: string; knockTarget: number; players: PublicPlayer[]; myCards: Card[];
+      waitingFor?: { playerName: string; phase: string } | null;
     }) => patch({
       gamePhase: 'PLAYING', orbit: d.orbit, round: d.round,
-      potTotal: d.potTotal, knockTarget: d.knockTarget,
+      potTotal: d.potTotal, payout: d.payout ?? 0,
+      knockTarget: d.knockTarget,
       players: d.players, myCards: d.myCards, serverPhase: d.phase,
+      ...(d.waitingFor !== undefined ? { waitingFor: d.waitingFor } : {}),
     });
 
     socket.on('round_started',   onRoundStarted);
@@ -228,6 +232,10 @@ export function GameProvider({
     socket.on('game_over',       onGameOver);
     socket.on('state_snapshot',  onStateSnapshot);
 
+    // Restore full game state (including turn info) now that all listeners are registered.
+    // This covers both fresh game-starts and page refreshes mid-game.
+    socket.emit('request_state', { roomCode });
+
     return () => {
       socket.off('round_started',   onRoundStarted);
       socket.off('cards_dealt',     onCardsDealt);
@@ -242,7 +250,7 @@ export function GameProvider({
       socket.off('game_over',       onGameOver);
       socket.off('state_snapshot',  onStateSnapshot);
     };
-  }, [patch, addLog]);
+  }, [patch, addLog, roomCode]);
 
   return (
     <GameContext.Provider value={{

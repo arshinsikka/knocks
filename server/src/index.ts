@@ -64,6 +64,19 @@ function publicPlayers(game: GameRoom) {
   }));
 }
 
+function getWaitingInfo(game: GameRoom): { playerName: string; phase: string } | null {
+  const s = game.getState();
+  if (s.phase === 'IN_OUT') {
+    const actor = game.currentActor();
+    return actor ? { playerName: actor.name, phase: 'in_out' } : null;
+  }
+  if (s.phase === 'CHALLENGE_JOIN') {
+    const actor = game.currentChallengeJoinActor();
+    return actor ? { playerName: actor.name, phase: 'challenge_join' } : null;
+  }
+  return null;
+}
+
 // ── Game event emitters ───────────────────────────────────────────────────────
 
 function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
@@ -434,8 +447,9 @@ io.on('connection', (socket: Socket) => {
 
   // ── GAME: rejoin_game (reconnect with new socketId) ──────────────────────────
   socket.on('rejoin_game', ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
-    const game = activeGames.get(roomCode?.toUpperCase());
-    if (!game) { socket.emit('error', { message: 'Game not found' }); return; }
+    const upper = roomCode?.toUpperCase();
+    const game = activeGames.get(upper);
+    if (!game) return; // Game not started yet — client stays in lobby silently
 
     const s = game.getState();
     const player = s.players.find((p) => p.name === playerName);
@@ -443,29 +457,43 @@ io.on('connection', (socket: Socket) => {
 
     // Re-associate socket
     (player as GamePlayer).socketId = socket.id;
-    socket.join(roomCode);
+    socket.join(upper);
 
-    const room = rooms.get(roomCode);
+    const room = rooms.get(upper);
     if (room) {
       const lp = room.players.find((p) => p.name === playerName);
       if (lp) lp.id = socket.id;
       room.lastActivity = Date.now();
     }
 
+    const payout = calculatePayout(s.round, s.potTotal);
+    const waitingInfo = getWaitingInfo(game);
+
     socket.emit('state_snapshot', {
       orbit: s.orbit,
       round: s.round,
       potTotal: s.potTotal,
+      payout,
       phase: s.phase,
       knockTarget: s.knockTarget,
       players: publicPlayers(game),
       myCards: player.cards,
+      waitingFor: waitingInfo ?? null,
     });
 
-    console.log(`"${playerName}" rejoined ${roomCode}`);
+    // Re-emit turn signals so the rejoining player knows where we are
+    if (waitingInfo) {
+      socket.emit('waiting_for', waitingInfo);
+      const actor = s.phase === 'IN_OUT' ? game.currentActor() : game.currentChallengeJoinActor();
+      if (actor && actor.socketId === socket.id) {
+        socket.emit('your_turn', { phase: waitingInfo.phase });
+      }
+    }
+
+    console.log(`"${playerName}" rejoined ${upper}`);
   });
 
-  // ── GAME: request_state (reconnect) ─────────────────────────────────────────
+  // ── GAME: request_state (restore context after GameProvider mounts) ──────────
   socket.on('request_state', ({ roomCode }: { roomCode: string }) => {
     const game = activeGames.get(roomCode);
     if (!game) return;
@@ -473,25 +501,42 @@ io.on('connection', (socket: Socket) => {
     const me = s.players.find((p) => p.socketId === socket.id);
     if (!me) return;
 
+    const payout = calculatePayout(s.round, s.potTotal);
+    const waitingInfo = getWaitingInfo(game);
+
     socket.emit('state_snapshot', {
       orbit: s.orbit,
       round: s.round,
       potTotal: s.potTotal,
+      payout,
       phase: s.phase,
       knockTarget: s.knockTarget,
       players: publicPlayers(game),
       myCards: me.cards,
+      waitingFor: waitingInfo ?? null,
     });
+
+    // Re-emit turn signals
+    if (waitingInfo) {
+      socket.emit('waiting_for', waitingInfo);
+      const actor = s.phase === 'IN_OUT' ? game.currentActor() : game.currentChallengeJoinActor();
+      if (actor && actor.socketId === socket.id) {
+        socket.emit('your_turn', { phase: waitingInfo.phase });
+      }
+    }
   });
 
   // ── disconnect ───────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`[-] ${socket.id}`);
 
-    // Remove from lobby
+    // Remove from lobby only — keep in-game rooms intact so players can reconnect
     for (const [code, room] of rooms) {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx === -1) continue;
+
+      // Game is in progress — don't evict; player may rejoin with a new socket
+      if (room.gameStarted) break;
 
       const [removed] = room.players.splice(idx, 1);
 
