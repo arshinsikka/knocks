@@ -92,7 +92,6 @@ function GameBoard({ roomCode }: { roomCode: string }) {
         orbit={orbit}
         round={round}
         potTotal={potTotal}
-        payout={payout}
         serverPhase={serverPhase}
         isMyTurn={isMyTurn}
       />

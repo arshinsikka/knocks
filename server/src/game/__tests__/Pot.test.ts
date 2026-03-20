@@ -27,18 +27,18 @@ describe('addOrbitContribution', () => {
 });
 
 describe('calculatePayout', () => {
-  test('rounds 1 and 2 return full pot', () => {
+  test('orbits 1 and 2 return full pot', () => {
     expect(calculatePayout(1, 20)).toBe(20);
     expect(calculatePayout(2, 20)).toBe(20);
   });
 
-  test('rounds 3-5 are capped at 12', () => {
+  test('orbit 3+ is capped at 12', () => {
     expect(calculatePayout(3, 20)).toBe(12);
     expect(calculatePayout(4, 20)).toBe(12);
-    expect(calculatePayout(5, 20)).toBe(12);
+    expect(calculatePayout(10, 20)).toBe(12);
   });
 
-  test('rounds 3-5 return pot if under 12', () => {
+  test('orbit 3+ returns pot if under 12', () => {
     expect(calculatePayout(3, 8)).toBe(8);
   });
 });

@@ -18,12 +18,11 @@ interface Props {
   orbit:       number;
   round:       number;
   potTotal:    number;
-  payout:      number;
   serverPhase: Phase;
   isMyTurn:    boolean;
 }
 
-export default function StatusBar({ roomCode, orbit, round, potTotal, payout, serverPhase, isMyTurn }: Props) {
+export default function StatusBar({ roomCode, orbit, round, potTotal, serverPhase, isMyTurn }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(async () => {
@@ -88,18 +87,12 @@ export default function StatusBar({ roomCode, orbit, round, potTotal, payout, se
         ORBIT {orbit} &middot; ROUND {round}
       </div>
 
-      {/* Row 3: pot / payout */}
-      <div style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 20 }}>
+      {/* Row 3: pot */}
+      <div style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
           POT&nbsp;
           <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
             ${potTotal}
-          </span>
-        </span>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-          PAYOUT&nbsp;
-          <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-            ${payout}
           </span>
         </span>
       </div>

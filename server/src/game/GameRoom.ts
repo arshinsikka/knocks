@@ -234,7 +234,8 @@ export class GameRoom {
       if (!result.tie) {
         // Clear winner — settle balances
         winner = result.winner;
-        payout = calculatePayout(s.round, s.potTotal);
+        payout = calculatePayout(s.orbit, s.potTotal);
+        console.log(`SETTLE: Orbit ${s.orbit}, Pot ${s.potTotal}, Challenge Amount ${payout}`);
         settleShowdown(winner!, result.losers, payout);
         // Track showdown breakdown stats
         winner!.showdownWinnings += payout;

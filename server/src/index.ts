@@ -130,7 +130,7 @@ function startTurnTimer(
 function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   const dealt = game.startRound();         // advances phase → IN_OUT
   const s = game.getState();
-  const payout = calculatePayout(s.round, s.potTotal);
+  const payout = calculatePayout(s.orbit, s.potTotal);
   const starter = s.players[s.orbitStarterIndex];
 
   io.to(roomCode).emit('round_started', {
@@ -571,7 +571,7 @@ io.on('connection', (socket: Socket) => {
       room.lastActivity = Date.now();
     }
 
-    const payout = calculatePayout(s.round, s.potTotal);
+    const payout = calculatePayout(s.orbit, s.potTotal);
     const waitingInfo = getWaitingInfo(game);
 
     socket.emit('state_snapshot', {
@@ -606,7 +606,7 @@ io.on('connection', (socket: Socket) => {
     const me = s.players.find((p) => p.socketId === socket.id);
     if (!me) return;
 
-    const payout = calculatePayout(s.round, s.potTotal);
+    const payout = calculatePayout(s.orbit, s.potTotal);
     const waitingInfo = getWaitingInfo(game);
 
     socket.emit('state_snapshot', {

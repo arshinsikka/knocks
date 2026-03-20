@@ -233,12 +233,13 @@ describe('Scenario 6: game end at knock target', () => {
 
 // ── Scenario 7: Payout splitting ─────────────────────────────────────────────
 describe('Scenario 7: payout splitting with many players', () => {
-  test('6 players, all IN, round 3+ payout capped at 12', () => {
+  test('6 players, all IN, orbit 3+ payout capped at 12', () => {
     const { game, players } = makeRoom(6);
     const st = (game as any).state;
 
-    // Set potTotal high so cap applies, jump to round 3
+    // Set potTotal high so cap applies, jump to orbit 3 round 3
     st.potTotal = 50;
+    st.orbit = 3;
     st.round = 3;
 
     // Initialize orbitDeck and pre-deal rounds 1+2 so each player has 2 valid

@@ -5,9 +5,9 @@ export function addOrbitContribution(potTotal: number, numPlayers: number): numb
   return potTotal + numPlayers * 2;
 }
 
-/** R1/R2 → full pot; R3/R4/R5 → capped at 12. */
-export function calculatePayout(round: number, potTotal: number): number {
-  if (round <= 2) return potTotal;
+/** Orbit 1/2 → full pot; Orbit 3+ → capped at 12. */
+export function calculatePayout(orbit: number, potTotal: number): number {
+  if (orbit <= 2) return potTotal;
   return Math.min(potTotal, 12);
 }
 
