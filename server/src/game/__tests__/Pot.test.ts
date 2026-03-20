@@ -11,6 +11,10 @@ function makePlayer(id: string): GamePlayer {
     balance: 0,
     knocks: 0,
     choice: null,
+    totalOrbitFees: 0,
+    showdownWinnings: 0,
+    showdownLosses: 0,
+    potCollected: 0,
   };
 }
 

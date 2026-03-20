@@ -223,10 +223,13 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
       winnerName: winner.name,
       winnerKnocks: winner.knocks,
       potTotal: s.potTotal,
-      finalBalances: s.players.map(({ name, balance, knocks }) => ({
-        name,
-        balance,
-        knocks,
+      knockTarget: s.knockTarget,
+      finalBalances: s.players.map(({
+        name, balance, knocks,
+        totalOrbitFees, showdownWinnings, showdownLosses, potCollected,
+      }) => ({
+        name, balance, knocks,
+        totalOrbitFees, showdownWinnings, showdownLosses, potCollected,
       })),
     });
     activeGames.delete(roomCode);

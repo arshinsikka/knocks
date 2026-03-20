@@ -57,4 +57,9 @@ export interface GamePlayer {
   balance: number;
   knocks: number;
   choice: PlayerChoice;
+  // Breakdown tracking for game-over screen
+  totalOrbitFees: number;     // negative; -2 per orbit
+  showdownWinnings: number;   // positive; peer-to-peer
+  showdownLosses: number;     // negative; peer-to-peer
+  potCollected: number;       // positive; only winner at game end
 }

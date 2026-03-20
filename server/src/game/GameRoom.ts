@@ -45,6 +45,10 @@ export class GameRoom {
       balance: 0,
       knocks: 0,
       choice: null,
+      totalOrbitFees: 0,
+      showdownWinnings: 0,
+      showdownLosses: 0,
+      potCollected: 0,
     }));
 
     const starterIndex = Math.floor(Math.random() * players.length);
@@ -84,6 +88,11 @@ export class GameRoom {
     if (s.round === 1) {
       // New orbit: ante, fresh deck, clear hands
       s.potTotal = addOrbitContribution(s.potTotal, s.players.length);
+      // Deduct each player's $2 contribution from their balance
+      for (const p of s.players) {
+        p.balance -= 2;
+        p.totalOrbitFees -= 2;
+      }
       s.orbitDeck = shuffle(buildDeck());
       s.allDealtCards = [];
       for (const p of s.players) {
@@ -214,6 +223,12 @@ export class GameRoom {
       winner = result.winner;
       payout = calculatePayout(s.round, s.potTotal);
       settleShowdown(winner, result.losers, payout);
+      // Track showdown breakdown
+      winner.showdownWinnings += payout;
+      const loserShare = result.losers.length > 0 ? payout / result.losers.length : 0;
+      for (const loser of result.losers) {
+        loser.showdownLosses -= loserShare;
+      }
       winner.knocks += 1;
       knockAwarded = true;
       newKnocks[winner.id] = winner.knocks;
@@ -239,6 +254,7 @@ export class GameRoom {
     const gameWinner = s.players.find((p) => p.knocks >= s.knockTarget);
     if (gameWinner) {
       gameWinner.balance += s.potTotal;
+      gameWinner.potCollected += s.potTotal;
       s.gameOverWinner = gameWinner.id;
       s.phase = 'GAME_OVER';
     }

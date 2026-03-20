@@ -36,7 +36,16 @@ export interface GameOverData {
   winnerName: string;
   winnerKnocks: number;
   potTotal: number;
-  finalBalances: { name: string; balance: number; knocks: number }[];
+  knockTarget: number;
+  finalBalances: {
+    name: string;
+    balance: number;
+    knocks: number;
+    totalOrbitFees: number;
+    showdownWinnings: number;
+    showdownLosses: number;
+    potCollected: number;
+  }[];
 }
 
 export type PlayerAction = 'in' | 'out' | 'join' | 'pass';
