@@ -145,11 +145,18 @@ describe('compareHands — normal mode', () => {
 // ── suit tiebreak ─────────────────────────────────────────────────────────────
 
 describe('suit tiebreak', () => {
-  test('same high cards — spades beats hearts', () => {
+  test('round 1 — same high cards, spades beats hearts', () => {
     const a = classifyHand([c(14, S), c(10, H), c(5, D)]);
     const b = classifyHand([c(14, H), c(10, S), c(5, C)]);
-    // a: high-card [14,10,5], first card suit=spades(4) vs hearts(3)
-    expect(compareHands(a, b, 'normal')).toBe(1);
+    // round 1: suit tiebreaker active — spades(4) > hearts(3)
+    expect(compareHands(a, b, 'normal', 1)).toBe(1);
+  });
+
+  test('round 2+ — identical ranks, no suit tiebreak → tie (0)', () => {
+    const a = classifyHand([c(14, S), c(10, H), c(5, D)]);
+    const b = classifyHand([c(14, H), c(10, S), c(5, C)]);
+    // round 2: no suit tiebreaker — same type and rank values → 0
+    expect(compareHands(a, b, 'normal', 2)).toBe(0);
   });
 });
 

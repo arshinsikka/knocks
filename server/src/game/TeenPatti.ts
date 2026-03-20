@@ -72,7 +72,7 @@ export function classifyHand(cards: Card[]): ClassifiedHand {
   if (pairRank !== null && kicker !== null) {
     return {
       type: 'pair',
-      values: [pairRank, kicker.rank, SUIT_ORDER[kicker.suit]],
+      values: [pairRank, kicker.rank], // suits never used for pair comparison
       cards: s,
     };
   }
@@ -87,11 +87,14 @@ export function classifyHand(cards: Card[]): ClassifiedHand {
 
 // ── compareHands ─────────────────────────────────────────────────────────────
 
-/** Returns 1 if A wins, -1 if B wins, 0 if absolute tie */
+/** Returns 1 if A wins, -1 if B wins, 0 if absolute tie.
+ *  Suit tiebreaker only applies in round 1 (single-card comparison).
+ *  Rounds 2-5 return 0 when type and all rank values are identical. */
 export function compareHands(
   a: ClassifiedHand,
   b: ClassifiedHand,
   mode: 'normal' | 'muflis' = 'normal',
+  round: number = 2,
 ): 1 | -1 | 0 {
   // Muflis special case: 2-3-5 offsuit is absolute best
   if (mode === 'muflis') {
@@ -128,10 +131,12 @@ export function compareHands(
     }
   }
 
-  // Suit tiebreak (always: higher suit wins regardless of mode)
-  const suitA = SUIT_ORDER[a.cards[0].suit];
-  const suitB = SUIT_ORDER[b.cards[0].suit];
-  if (suitA !== suitB) return suitA > suitB ? 1 : -1;
+  // Suit tiebreak only in round 1 (single-card deal)
+  if (round === 1) {
+    const suitA = SUIT_ORDER[a.cards[0].suit];
+    const suitB = SUIT_ORDER[b.cards[0].suit];
+    if (suitA !== suitB) return suitA > suitB ? 1 : -1;
+  }
 
   return 0;
 }

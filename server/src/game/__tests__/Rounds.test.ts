@@ -136,7 +136,7 @@ describe('getBestHand — round 3 joker (spec cases)', () => {
     // cardsB: R-B-B → no wild → pair of 5s
     expect(handB.type).toBe('pair');
     // Trail > pair
-    expect(compareHands(handA, handB, 'normal')).toBe(1);
+    expect(compareHands(handA, handB, 'normal', 3)).toBe(1);
   });
 
   // Wild substitution picks the optimal card (trail over pair)

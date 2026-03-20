@@ -38,9 +38,10 @@ function compareCards(a: Card, b: Card): 1 | -1 | 0 {
 function bestOf(
   hands: ClassifiedHand[],
   mode: 'normal' | 'muflis',
+  round: number,
 ): ClassifiedHand {
   return hands.reduce((best, curr) =>
-    compareHands(curr, best, mode) === 1 ? curr : best,
+    compareHands(curr, best, mode, round) === 1 ? curr : best,
   );
 }
 
@@ -71,7 +72,7 @@ export function getBestHand(
     const hands: ClassifiedHand[] = candidates.map((c) =>
       classifyHand([playerCards[0], playerCards[1], c]),
     );
-    return bestOf(hands, 'normal');
+    return bestOf(hands, 'normal', 2);
   }
 
   // ── Round 3: 3 cards, possible wild ─────────────────────────────────────
@@ -102,7 +103,7 @@ export function getBestHand(
     let bestSub: Card | null = null;
     for (const sub of deck) {
       const h = classifyHand([c0, c1, sub]);
-      if (!bestHand || compareHands(h, bestHand, 'normal') === 1) {
+      if (!bestHand || compareHands(h, bestHand, 'normal', 3) === 1) {
         bestHand = h;
         bestSub = sub;
       }
@@ -117,14 +118,14 @@ export function getBestHand(
   if (round === 4) {
     const subsets = combinations3(playerCards);
     const hands = subsets.map((s) => classifyHand(s));
-    return bestOf(hands, 'muflis');
+    return bestOf(hands, 'muflis', 4);
   }
 
   // ── Round 5: 5 cards, best normal 3-card subset ──────────────────────────
   if (round === 5) {
     const subsets = combinations3(playerCards);
     const hands = subsets.map((s) => classifyHand(s));
-    return bestOf(hands, 'normal');
+    return bestOf(hands, 'normal', 5);
   }
 
   throw new Error(`Unknown round: ${round}`);

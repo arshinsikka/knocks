@@ -27,13 +27,13 @@ export function resolveShowdown(
     if (round === 1) {
       return compareCards(curr.hand.cards[0], champion.hand.cards[0]) === 1 ? curr : champion;
     }
-    return compareHands(curr.hand, champion.hand, mode) === 1 ? curr : champion;
+    return compareHands(curr.hand, champion.hand, mode, round) === 1 ? curr : champion;
   });
 
   // Check for ties: all players whose hand equals the best
   const tiedForBest = evaluated.filter((e) => {
     if (round === 1) return compareCards(e.hand.cards[0], best.hand.cards[0]) === 0;
-    return compareHands(e.hand, best.hand, mode) === 0;
+    return compareHands(e.hand, best.hand, mode, round) === 0;
   });
 
   const tie = tiedForBest.length > 1;
