@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { PlayerAction } from '@/context/GameContext';
 import { getSocket } from '@/lib/socket';
 
+const TURN_SECS = 15;
+
 interface Props {
   isMyTurn:      boolean;
   turnPhase:     'in_out' | 'challenge_join' | null;
@@ -63,29 +65,78 @@ function WaitText({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Countdown({ secs }: { secs: number }) {
+  const urgent = secs <= 5 && secs > 0;
+  return (
+    <span style={{
+      fontSize: urgent ? 13 : 11,
+      fontWeight: urgent ? 700 : 400,
+      color: urgent ? 'var(--text-primary)' : 'var(--text-muted)',
+      fontFamily: 'var(--font-jetbrains-mono), monospace',
+      minWidth: 22,
+      textAlign: 'center',
+      flexShrink: 0,
+      transition: 'color 300ms ease-out',
+    }}>
+      {secs}
+    </span>
+  );
+}
+
 export default function ActionBar({
   isMyTurn, turnPhase, serverPhase, waitingFor,
   myName, playerChoices, emitIn, emitOut, emitJoin, emitPass,
 }: Props) {
-  // Prevent double-clicks: disable all buttons immediately after any action.
-  // Reset when isMyTurn or turnPhase changes — the turnPhase change is critical:
-  // when P2 clicks OUT and immediately becomes the challenge actor, isMyTurn stays
-  // true but turnPhase flips from 'in_out' → 'challenge_join', which must reset
-  // the guard so the Join/Pass buttons are not permanently disabled.
+  // ── Double-click guard ────────────────────────────────────────────────────
   const [acted, setActed] = useState(false);
 
+  // Reset on every meaningful phase transition.
+  // Critically: when P2 clicks OUT and immediately becomes the challenge actor,
+  // isMyTurn stays true but turnPhase flips in→cj, which resets acted.
   useEffect(() => {
-    console.log('[ActionBar] phase change → reset acted. isMyTurn:', isMyTurn, 'turnPhase:', turnPhase);
+    console.log('[ActionBar] reset acted — isMyTurn:', isMyTurn, 'turnPhase:', turnPhase);
     setActed(false);
   }, [isMyTurn, turnPhase]);
 
-  // Re-enable buttons if the server sends back an error (e.g. invalid action).
+  // Belt-and-suspenders: also reset directly on your_turn socket event.
+  // This fires even if isMyTurn/turnPhase haven't changed yet in React state.
   useEffect(() => {
     const socket = getSocket();
-    const onError = () => { console.log('[ActionBar] server error — re-enabling buttons'); setActed(false); };
-    socket.on('error', onError);
-    return () => { socket.off('error', onError); };
+    const onYourTurn = (d: { phase: string }) => {
+      console.log('[ActionBar] your_turn received (', d.phase, ') → reset acted');
+      setActed(false);
+    };
+    const onError = () => {
+      console.log('[ActionBar] server error → reset acted');
+      setActed(false);
+    };
+    socket.on('your_turn', onYourTurn);
+    socket.on('error',     onError);
+    return () => {
+      socket.off('your_turn', onYourTurn);
+      socket.off('error',     onError);
+    };
   }, []);
+
+  // ── Countdown timer ───────────────────────────────────────────────────────
+  const [countdown, setCountdown] = useState(TURN_SECS);
+
+  // Track who the active actor is; changing this value resets the countdown.
+  const activeActor = isMyTurn
+    ? `me:${turnPhase ?? ''}`
+    : waitingFor
+      ? `them:${waitingFor.playerName}:${waitingFor.phase}`
+      : null;
+
+  useEffect(() => {
+    setCountdown(TURN_SECS);
+    if (!activeActor) return;
+    const interval = setInterval(() => {
+      setCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeActor]);
 
   function act(label: string, fn: () => void) {
     if (acted) return;
@@ -95,8 +146,11 @@ export default function ActionBar({
   }
 
   const myChoice = playerChoices[myName];
-  console.log('[ActionBar] render | isMyTurn:', isMyTurn, '| turnPhase:', turnPhase, '| serverPhase:', serverPhase, '| acted:', acted, '| myChoice:', myChoice);
+  console.log('[ActionBar] render | isMyTurn:', isMyTurn, '| turnPhase:', turnPhase,
+    '| serverPhase:', serverPhase, '| acted:', acted, '| myChoice:', myChoice,
+    '| countdown:', countdown);
 
+  // ── Content ───────────────────────────────────────────────────────────────
   let content: React.ReactNode;
 
   if (isMyTurn && turnPhase === 'in_out') {
@@ -104,24 +158,28 @@ export default function ActionBar({
       <>
         <Btn label="In"  onClick={() => act('In',  emitIn)}  primary disabled={acted} />
         <Btn label="Out" onClick={() => act('Out', emitOut)}         disabled={acted} />
+        <Countdown secs={countdown} />
       </>
     );
   } else if (isMyTurn && turnPhase === 'challenge_join') {
     content = (
       <>
-        <Btn label="Join Challenge" onClick={() => act('Join Challenge', emitJoin)} primary disabled={acted} />
-        <Btn label="Pass"           onClick={() => act('Pass',           emitPass)}         disabled={acted} />
+        <Btn label="Join" onClick={() => act('Join', emitJoin)} primary disabled={acted} />
+        <Btn label="Pass" onClick={() => act('Pass', emitPass)}         disabled={acted} />
+        <Countdown secs={countdown} />
       </>
     );
   } else if (serverPhase === 'IN_OUT') {
     content = waitingFor
-      ? <WaitText>Waiting for {waitingFor.playerName}&hellip;</WaitText>
+      ? <WaitText>Waiting for {waitingFor.playerName}&hellip; ({countdown}s)</WaitText>
       : <WaitText>Round in progress&hellip;</WaitText>;
   } else if (serverPhase === 'CHALLENGE_JOIN') {
     if (myChoice === 'in') {
-      content = <WaitText>Waiting for challenges&hellip;</WaitText>;
+      content = waitingFor
+        ? <WaitText>Waiting for {waitingFor.playerName} to challenge&hellip; ({countdown}s)</WaitText>
+        : <WaitText>Waiting for challenges&hellip;</WaitText>;
     } else if (waitingFor) {
-      content = <WaitText>Waiting for {waitingFor.playerName} to decide&hellip;</WaitText>;
+      content = <WaitText>Waiting for {waitingFor.playerName} to decide&hellip; ({countdown}s)</WaitText>;
     } else {
       content = <WaitText>Challenge window&hellip;</WaitText>;
     }

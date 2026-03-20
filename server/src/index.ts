@@ -27,8 +27,11 @@ interface RoomState {
 const rooms = new Map<string, RoomState>();
 const activeGames = new Map<string, GameRoom>(); // roomCode → GameRoom
 const turnTimers = new Map<string, ReturnType<typeof setTimeout>>(); // roomCode → timer
+// Lobby disconnect grace-period timers: "${roomCode}:${playerName}" → setTimeout
+const lobbyDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const TURN_TIMEOUT_MS = 15_000;
+const LOBBY_GRACE_MS  = 60_000;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -352,7 +355,7 @@ io.on('connection', (socket: Socket) => {
         hostId: socket.id,
       });
 
-      console.log(`Room ${code} created by "${playerName}"`);
+      console.log(`[room] CREATED ${code} by "${playerName}" (total rooms: ${rooms.size})`);
     },
   );
 
@@ -384,7 +387,7 @@ io.on('connection', (socket: Socket) => {
         hostId: room.hostId,
       });
 
-      console.log(`"${playerName}" joined ${room.code}`);
+      console.log(`[room] JOINED ${room.code} by "${playerName}" (players: ${room.players.length})`);
     },
   );
 
@@ -410,7 +413,7 @@ io.on('connection', (socket: Socket) => {
       knockTarget: room.knockTarget,
     });
 
-    console.log(`Game started in ${roomCode}`);
+    console.log(`[room] GAME STARTED in ${roomCode} (players: ${room.players.length})`);
 
     // Small delay then deal round 1
     setTimeout(() => emitRoundStart(io, game, roomCode), 800);
@@ -506,12 +509,46 @@ io.on('connection', (socket: Socket) => {
     afterChallengeJoin(io, game, code);
   });
 
-  // ── GAME: rejoin_game (reconnect with new socketId) ──────────────────────────
+  // ── GAME/LOBBY: rejoin_game ──────────────────────────────────────────────────
+  // Handles both lobby reconnections (page refresh before game start) and
+  // in-game reconnections (page refresh mid-game).
   socket.on('rejoin_game', ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
     const upper = roomCode?.toUpperCase();
-    const game = activeGames.get(upper);
-    if (!game) return; // Game not started yet — client stays in lobby silently
+    const game  = activeGames.get(upper);
 
+    if (!game) {
+      // ── Lobby reconnection path ───────────────────────────────────────────
+      const room = rooms.get(upper);
+      if (!room || room.gameStarted) return; // Unknown room or race with game start
+
+      const player = room.players.find((p) => p.name === playerName);
+      if (!player) return; // Player not in this lobby; ignore silently
+
+      // Cancel the 60-second eviction grace period
+      const timerKey = `${upper}:${playerName}`;
+      const pending = lobbyDisconnectTimers.get(timerKey);
+      if (pending) { clearTimeout(pending); lobbyDisconnectTimers.delete(timerKey); }
+
+      // Re-associate socket ID
+      const oldId = player.id;
+      player.id   = socket.id;
+      if (room.hostId === oldId) room.hostId = socket.id;
+      room.lastActivity = Date.now();
+      socket.join(upper);
+
+      // Broadcast updated player list to everyone (including the reconnecting socket,
+      // which just joined the room).  LobbyView listens for player_joined to refresh.
+      io.to(upper).emit('player_joined', {
+        players: room.players,
+        newPlayer: { id: socket.id, name: playerName },
+        hostId: room.hostId,
+      });
+
+      console.log(`[room] "${playerName}" rejoined lobby ${upper} (players: ${room.players.length})`);
+      return;
+    }
+
+    // ── In-game reconnection path ─────────────────────────────────────────────
     const s = game.getState();
     const player = s.players.find((p) => p.name === playerName);
     if (!player) { socket.emit('error', { message: 'Player not in game' }); return; }
@@ -551,7 +588,7 @@ io.on('connection', (socket: Socket) => {
       }
     }
 
-    console.log(`"${playerName}" rejoined ${upper}`);
+    console.log(`[room] "${playerName}" rejoined game ${upper}`);
   });
 
   // ── GAME: request_state (restore context after GameProvider mounts) ──────────
@@ -591,26 +628,58 @@ io.on('connection', (socket: Socket) => {
   socket.on('disconnect', () => {
     console.log(`[-] ${socket.id}`);
 
-    // Remove from lobby only — keep in-game rooms intact so players can reconnect
     for (const [code, room] of rooms) {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx === -1) continue;
 
-      // Game is in progress — don't evict; player may rejoin with a new socket
-      if (room.gameStarted) break;
-
-      const [removed] = room.players.splice(idx, 1);
-
-      if (room.players.length === 0) {
-        rooms.delete(code);
-      } else {
-        if (room.hostId === socket.id) room.hostId = room.players[0].id;
-        io.to(code).emit('player_left', {
-          players: room.players,
-          removedPlayer: removed,
-          hostId: room.hostId,
-        });
+      if (room.gameStarted) {
+        // In-game disconnect: keep room + player intact; they can rejoin_game
+        console.log(`[room] ${code} in-game disconnect: "${room.players[idx].name}" — may rejoin`);
+        break;
       }
+
+      // Lobby disconnect: start a 60-second grace period before evicting.
+      // This absorbs page refreshes, transport upgrades, and brief network blips.
+      const playerName        = room.players[idx].name;
+      const timerKey          = `${code}:${playerName}`;
+      const disconnectedSockId = socket.id;
+
+      // Cancel any previous grace timer for this player (e.g. double-disconnect)
+      const existing = lobbyDisconnectTimers.get(timerKey);
+      if (existing) clearTimeout(existing);
+
+      console.log(`[room] ${code} lobby disconnect: "${playerName}" — 60s grace started`);
+
+      const t = setTimeout(() => {
+        lobbyDisconnectTimers.delete(timerKey);
+        const r = rooms.get(code);
+        if (!r || r.gameStarted) return; // Game started during grace — leave them in
+
+        const i = r.players.findIndex((p) => p.name === playerName);
+        if (i === -1) return; // Already evicted somehow
+
+        // If the player reconnected their id will be different — don't evict
+        if (r.players[i].id !== disconnectedSockId) return;
+
+        const [removed] = r.players.splice(i, 1);
+        if (r.hostId === removed.id && r.players.length > 0) {
+          r.hostId = r.players[0].id;
+        }
+
+        if (r.players.length > 0) {
+          io.to(code).emit('player_left', {
+            players: r.players,
+            removedPlayer: removed,
+            hostId: r.hostId,
+          });
+        }
+        // NOTE: We intentionally do NOT delete empty rooms here.
+        // The 30-minute inactivity cleanup handles that. This prevents
+        // a solo host refresh from killing the room.
+        console.log(`[room] ${code} evicted "${playerName}" after 60s (players: ${r.players.length})`);
+      }, LOBBY_GRACE_MS);
+
+      lobbyDisconnectTimers.set(timerKey, t);
       break;
     }
   });
@@ -625,9 +694,16 @@ setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms) {
     if (now - room.lastActivity > ROOM_TTL_MS) {
+      // Cancel any pending lobby disconnect timers for this room
+      for (const p of room.players) {
+        const key = `${code}:${p.name}`;
+        const t   = lobbyDisconnectTimers.get(key);
+        if (t) { clearTimeout(t); lobbyDisconnectTimers.delete(key); }
+      }
+      clearTurnTimer(code);
       rooms.delete(code);
       activeGames.delete(code);
-      console.log(`Room ${code} expired (idle > 30 min)`);
+      console.log(`[room] EXPIRED ${code} (idle > 30 min) — total rooms: ${rooms.size}`);
     }
   }
 }, CLEANUP_INTERVAL_MS);
