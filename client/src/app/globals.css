@@ -47,6 +47,11 @@
     transition: background-color 5000s ease-in-out 0s;
   }
 
+  input::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
   /* mono number spans */
   .mono { font-family: var(--font-jetbrains-mono), monospace; }
 }

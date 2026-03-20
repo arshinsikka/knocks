@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 
@@ -73,8 +73,21 @@ export default function Home() {
   const [roomCode,    setRoomCode]    = useState('');
   const [error,       setError]       = useState('');
   const [loading,     setLoading]     = useState(false);
-  const nameRef = useRef(name);
+  const nameRef    = useRef(name);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   nameRef.current = name;
+
+  const cancelTimeout = useCallback(() => {
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+  }, []);
+
+  const startTimeout = useCallback(() => {
+    cancelTimeout();
+    timeoutRef.current = setTimeout(() => {
+      setLoading(false);
+      setError('Could not connect to server. Please try again.');
+    }, 10_000);
+  }, [cancelTimeout]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -83,6 +96,7 @@ export default function Home() {
       roomCode: string; knockTarget: number;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
+      cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
         knockTarget: d.knockTarget, players: d.players, hostId: d.hostId,
@@ -94,6 +108,7 @@ export default function Home() {
       roomCode: string; knockTarget: number;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
+      cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
         knockTarget: d.knockTarget, players: d.players, hostId: d.hostId,
@@ -102,6 +117,7 @@ export default function Home() {
     };
 
     const onError = ({ message }: { message: string }) => {
+      cancelTimeout();
       setError(message); setLoading(false);
     };
 
@@ -113,7 +129,7 @@ export default function Home() {
       socket.off('room_joined',  onJoined);
       socket.off('error',        onError);
     };
-  }, [router]);
+  }, [router, cancelTimeout]);
 
   const guard = () => {
     if (!name.trim()) { setError('Enter your name first'); return false; }
@@ -205,7 +221,7 @@ export default function Home() {
                 label={loading ? 'Creating\u2026' : 'Create'} primary
                 disabled={loading}
                 onClick={() => {
-                  setError(''); setLoading(true);
+                  setError(''); setLoading(true); startTimeout();
                   getSocket().emit('create_room', { playerName: name.trim(), knockTarget });
                 }}
               />
@@ -246,7 +262,7 @@ export default function Home() {
                 disabled={loading || roomCode.length !== 6}
                 onClick={() => {
                   if (!roomCode.trim()) { setError('Enter a room code'); return; }
-                  setError(''); setLoading(true);
+                  setError(''); setLoading(true); startTimeout();
                   getSocket().emit('join_room', {
                     roomCode: roomCode.trim().toUpperCase(),
                     playerName: name.trim(),
