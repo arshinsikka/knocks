@@ -1,4 +1,5 @@
 import { GameRoom } from '../GameRoom';
+import { buildDeck, shuffle } from '../Deck';
 
 function makeRoom(numPlayers: number, knockTarget: 5 | 6 = 5) {
   const players = Array.from({ length: numPlayers }, (_, i) => ({
@@ -132,29 +133,35 @@ describe('Scenario 3: 1 IN + 1 joins challenge', () => {
 
     const summary = game.resolveRound();
     expect(summary.participants.length).toBe(2); // p1 + whoever joined
-    expect(summary.knockAwarded).toBe(true); // winner of showdown gets knock
+    expect(summary.knockAwarded).toBe(false); // showdowns NEVER award knocks
     expect(summary.winner).not.toBeNull();
   });
 });
 
 // ── Scenario 4: 3 IN players → showdown, 2 losers split ─────────────────────
 describe('Scenario 4: 3 IN players', () => {
-  test('winner gets payout, two losers split', () => {
+  test('winner gets payout, two losers split; no knock from showdown', () => {
     const { game, players } = makeRoom(3);
     game.startRound();
-    // Round 1: pot = 6, payout = 6 (full pot for R1)
+    // Round 1: pot = 6 (3×$2 orbit fee), each player balance = -2 after startRound
     allChooseInOut(game, players, 'in');
     expect(game.getState().phase).toBe('SHOWDOWN');
 
     const summary = game.resolveRound();
     expect(summary.participants.length).toBe(3);
     expect(summary.winner).not.toBeNull();
-    // Verify balances: winner +payout, losers each -payout/2
+    // Showdowns do NOT award knocks
+    expect(summary.knockAwarded).toBe(false);
+
+    // Balances after orbit fee (-$2 each) + showdown settlement
+    const ORBIT_FEE = 2;
     const s = game.getState();
     const winner = s.players.find(p => p.id === summary.winner)!;
     const losers = s.players.filter(p => p.id !== summary.winner);
-    expect(winner.balance).toBe(summary.payout);
-    losers.forEach(l => expect(l.balance).toBe(-(summary.payout / 2)));
+    expect(winner.balance).toBe(summary.payout - ORBIT_FEE);
+    losers.forEach(l =>
+      expect(l.balance).toBeCloseTo(-(summary.payout / losers.length) - ORBIT_FEE),
+    );
   });
 });
 
@@ -228,18 +235,35 @@ describe('Scenario 6: game end at knock target', () => {
 describe('Scenario 7: payout splitting with many players', () => {
   test('6 players, all IN, round 3+ payout capped at 12', () => {
     const { game, players } = makeRoom(6);
-    // Set potTotal high so cap applies
-    (game as any).state.potTotal = 50;
-    (game as any).state.round = 3;
+    const st = (game as any).state;
 
-    game.startRound();
+    // Set potTotal high so cap applies, jump to round 3
+    st.potTotal = 50;
+    st.round = 3;
+
+    // Initialize orbitDeck and pre-deal rounds 1+2 so each player has 2 valid
+    // cards before startRound() deals the 3rd card (round 3).
+    const deck = shuffle(buildDeck());
+    st.orbitDeck = [...deck];
+    st.allDealtCards = [];
+    for (let r = 0; r < 2; r++) {
+      for (const p of st.players) {
+        const card = st.orbitDeck.pop()!;
+        p.cards.push(card);
+        st.allDealtCards.push(card);
+      }
+    }
+
+    game.startRound(); // deals the 3rd card; round=3 so no orbit fee deduction
     // All 6 say IN
     allChooseInOut(game, players, 'in');
     const summary = game.resolveRound();
     expect(summary.payout).toBe(12); // capped
+    // Showdown → no knock
+    expect(summary.knockAwarded).toBe(false);
     const s = game.getState();
     const winner = s.players.find(p => p.id === summary.winner)!;
-    expect(winner.balance).toBe(12);
+    expect(winner.balance).toBe(12); // no orbit fee (round 3, not round 1)
     const losers = s.players.filter(p => p.id !== summary.winner);
     losers.forEach(l => expect(l.balance).toBeCloseTo(-12 / 5));
   });

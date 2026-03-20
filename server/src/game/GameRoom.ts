@@ -198,6 +198,16 @@ export class GameRoom {
       (p) => p.choice === 'in' || p.choice === 'join',
     );
 
+    // Knock rule: ONLY when exactly 1 IN player and 0 joined players (no showdown).
+    // A knock NEVER comes from winning a showdown.
+    const inPlayers     = s.players.filter((p) => p.choice === 'in');
+    const joinedPlayers = s.players.filter((p) => p.choice === 'join');
+    const awardKnock    = inPlayers.length === 1 && joinedPlayers.length === 0;
+    console.log(
+      `[knock] check: ${inPlayers.length} IN, ${joinedPlayers.length} joined` +
+      ` → knock ${awardKnock ? 'AWARDED' : 'NOT awarded'}`,
+    );
+
     let winner: GamePlayer | null = null;
     let payout = 0;
     let knockAwarded = false;
@@ -206,15 +216,15 @@ export class GameRoom {
     if (participants.length === 0) {
       // No participants — no payout, no knock
       payout = 0;
-    } else if (participants.length === 1) {
-      // Only one — gets the knock without showdown
-      winner = participants[0];
+    } else if (awardKnock) {
+      // Single IN player, nobody joined — knock awarded, no showdown, no payout
+      winner = inPlayers[0];
       payout = 0;
       winner.knocks += 1;
       knockAwarded = true;
       newKnocks[winner.id] = winner.knocks;
     } else {
-      // Full showdown
+      // Full showdown (2+ participants) — determine winner/payout but NO knock
       const result: ShowdownResult = resolveShowdown(
         participants,
         s.round,
@@ -223,15 +233,12 @@ export class GameRoom {
       winner = result.winner;
       payout = calculatePayout(s.round, s.potTotal);
       settleShowdown(winner, result.losers, payout);
-      // Track showdown breakdown
+      // Track showdown breakdown stats (knock is NOT awarded here)
       winner.showdownWinnings += payout;
       const loserShare = result.losers.length > 0 ? payout / result.losers.length : 0;
       for (const loser of result.losers) {
         loser.showdownLosses -= loserShare;
       }
-      winner.knocks += 1;
-      knockAwarded = true;
-      newKnocks[winner.id] = winner.knocks;
     }
 
     const summary: RoundSummary = {

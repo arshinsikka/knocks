@@ -1,6 +1,7 @@
 import { getBestHand } from '../Rounds';
 import { buildDeck } from '../Deck';
 import { Card } from '../types';
+import { classifyHand, compareHands } from '../TeenPatti';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
 
@@ -73,6 +74,79 @@ describe('getBestHand — round 3', () => {
     const cards = [c(5, 'hearts'), c(6, 'diamonds'), c(7, 'hearts')];
     const hand = getBestHand(cards, 3, cards);
     expect(hand.type).toBe('sequence'); // 5H-6D-7H is a sequence
+  });
+});
+
+// ── Round 3 joker spec tests ──────────────────────────────────────────────────
+describe('getBestHand — round 3 joker (spec cases)', () => {
+  // [H5, D8, SK]: red, red, black → c2 is wild
+  test('[H5, D8, SK] RRB → c2 is wild, improves over plain high_card', () => {
+    const cards = [c(5, 'hearts'), c(8, 'diamonds'), c(13, 'spades')];
+    const plain = classifyHand(cards as [Card, Card, Card]);
+    const hand  = getBestHand(cards, 3, cards);
+    expect(hand.cards.length).toBe(3);
+    // Plain is high_card; with wild (replacing K♠) best is pair (e.g. 8-8 or 5-5)
+    expect(plain.type).toBe('high_card');
+    expect(['trail', 'pure_sequence', 'sequence', 'color', 'pair']).toContain(hand.type);
+  });
+
+  // [S5, C8, HK]: black, black, red → c2 is wild
+  test('[S5, C8, HK] BBR → c2 is wild, improves over plain high_card', () => {
+    const cards = [c(5, 'spades'), c(8, 'clubs'), c(13, 'hearts')];
+    const plain = classifyHand(cards as [Card, Card, Card]);
+    const hand  = getBestHand(cards, 3, cards);
+    expect(hand.cards.length).toBe(3);
+    expect(plain.type).toBe('high_card');
+    expect(['trail', 'pure_sequence', 'sequence', 'color', 'pair']).toContain(hand.type);
+  });
+
+  // [H5, S8, CK]: red, black, black → NO wild
+  test('[H5, S8, CK] RBB → no wild → plain classification', () => {
+    const cards = [c(5, 'hearts'), c(8, 'spades'), c(13, 'clubs')];
+    const hand  = getBestHand(cards, 3, cards);
+    // H5, S8, CK → high_card (no sequence, no flush, no pair)
+    expect(hand.type).toBe('high_card');
+    // Must equal plain classification exactly
+    const plain = classifyHand(cards as [Card, Card, Card]);
+    expect(hand.type).toBe(plain.type);
+  });
+
+  // [H5, C8, DK]: red, black, red → NO wild
+  test('[H5, C8, DK] RBR → no wild → plain classification', () => {
+    const cards = [c(5, 'hearts'), c(8, 'clubs'), c(13, 'diamonds')];
+    const hand  = getBestHand(cards, 3, cards);
+    expect(hand.type).toBe('high_card');
+    const plain = classifyHand(cards as [Card, Card, Card]);
+    expect(hand.type).toBe(plain.type);
+  });
+
+  // Wild player gets trail, beats opponent's pair
+  test('wild [H7, D7, SK] beats plain pair [H5, SS, C2]', () => {
+    // H7(R) D7(R) K♠(B) → RRB → wild c2. Replace K♠ with 7♣ → trail 7-7-7
+    const cardsA  = [c(7, 'hearts'), c(7, 'diamonds'), c(13, 'spades')];
+    // H5(R) S5(B) C2(B) → RBB → no wild → plain pair of 5s
+    const cardsB  = [c(5, 'hearts'), c(5, 'spades'), c(2, 'clubs')];
+    const allDealt = [...cardsA, ...cardsB];
+
+    const handA = getBestHand(cardsA, 3, allDealt);
+    const handB = getBestHand(cardsB, 3, allDealt);
+
+    // Wild tries all 52 cards; 7♣ (or 7♠) → trail 7-7-7
+    expect(handA.type).toBe('trail');
+    // cardsB: R-B-B → no wild → pair of 5s
+    expect(handB.type).toBe('pair');
+    // Trail > pair
+    expect(compareHands(handA, handB, 'normal')).toBe(1);
+  });
+
+  // Wild substitution picks the optimal card (trail over pair)
+  test('[H5, D5, S9] RRB → wild picks trail 5-5-5 not pair', () => {
+    // c0=5H(R), c1=5D(R), c2=9♠(B) → RRB → wild
+    // With wild: replace 9♠ with 5♣ or 5♠ → trail 5-5-5
+    const cards = [c(5, 'hearts'), c(5, 'diamonds'), c(9, 'spades')];
+    const hand  = getBestHand(cards, 3, cards);
+    expect(hand.type).toBe('trail');
+    expect(hand.values[0]).toBe(5); // trail of 5s
   });
 });
 

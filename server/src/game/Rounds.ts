@@ -77,25 +77,40 @@ export function getBestHand(
   // ── Round 3: 3 cards, possible wild ─────────────────────────────────────
   if (round === 3) {
     const [c0, c1, c2] = playerCards;
+    const col = (c: Card) => `${c.rank}${c.suit[0].toUpperCase()}`;
+    const colorStr = (c: Card) => (isRed(c) ? 'R' : 'B');
+
     const hasWild =
       (isRed(c0) && isRed(c1) && isBlack(c2)) ||
       (isBlack(c0) && isBlack(c1) && isRed(c2));
 
+    console.log(
+      `[R3] ${col(c0)} ${col(c1)} ${col(c2)}` +
+      ` (${colorStr(c0)}${colorStr(c1)}${colorStr(c2)})` +
+      ` → joker: ${hasWild}`,
+    );
+
     if (!hasWild) {
-      return classifyHand(playerCards as [Card, Card, Card]);
+      const hand = classifyHand(playerCards as [Card, Card, Card]);
+      console.log(`[R3] no joker → ${hand.type}`);
+      return hand;
     }
 
-    // c2 is wild — try every possible substitution
-    const dealtKeys = new Set(allDealtCards.map(cardKey));
+    // c2 is wild — try ALL 52 possible substitutions (wild can be any card)
     const deck = buildDeck();
-    const substitutions = deck.filter(
-      (c) => !dealtKeys.has(cardKey(c)) || cardKey(c) === cardKey(c2),
+    let bestHand: ClassifiedHand | null = null;
+    let bestSub: Card | null = null;
+    for (const sub of deck) {
+      const h = classifyHand([c0, c1, sub]);
+      if (!bestHand || compareHands(h, bestHand, 'normal') === 1) {
+        bestHand = h;
+        bestSub = sub;
+      }
+    }
+    console.log(
+      `[R3] joker → best wild: ${col(bestSub!)} → ${bestHand!.type}`,
     );
-
-    const hands: ClassifiedHand[] = substitutions.map((sub) =>
-      classifyHand([c0, c1, sub]),
-    );
-    return bestOf(hands, 'normal');
+    return bestHand!;
   }
 
   // ── Round 4: 4 cards, best muflis 3-card subset ──────────────────────────
