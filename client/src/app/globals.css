@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary:    #0a0a0a;
+  --bg-elevated:   #111111;
+  --bg-surface:    #1a1a1a;
+  --bg-hover:      #222222;
+  --border-subtle: #2a2a2a;
+  --border-medium: #333333;
+  --border-bright: #555555;
+  --text-primary:  #ffffff;
+  --text-secondary:#b3b3b3;
+  --text-muted:    #666666;
+  --card-face:     #ffffff;
+  --card-text:     #000000;
+  --accent-glow:   rgba(255,255,255,0.08);
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: #050505;
+    color: var(--text-primary);
+    font-family: var(--font-outfit), system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: #ffffff;
+    color: #0a0a0a;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff;
+    -webkit-box-shadow: 0 0 0px 1000px #0a0a0a inset;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* mono number spans */
+  .mono { font-family: var(--font-jetbrains-mono), monospace; }
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes dealCard {
+  from { transform: translateY(-80px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+@keyframes turnPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+  50%       { box-shadow: 0 0 0 3px rgba(255,255,255,0.30); }
+}
+
+@keyframes waitingPulse {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1;    }
+}
+
+@keyframes knockSlide {
+  0%   { transform: translateY(-110%); opacity: 0; }
+  10%  { transform: translateY(0);     opacity: 1; }
+  85%  { transform: translateY(0);     opacity: 1; }
+  100% { transform: translateY(-110%); opacity: 0; }
+}
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes particleRise {
+  from { transform: translateY(0)     translateX(0);               opacity: 0.5; }
+  to   { transform: translateY(-100vh) translateX(var(--dx, 0px)); opacity: 0;   }
+}
+
+@keyframes btnTap {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(0.97); }
+}
+
+@keyframes badgeFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Utility classes ─────────────────────────────────────────────────────────── */
+
+.card-deal {
+  animation: dealCard 0.28s ease-out both;
+}
+
+.turn-glow {
+  animation: turnPulse 2s ease-in-out infinite;
+}
+
+.waiting-pulse {
+  animation: waitingPulse 2s ease-in-out infinite;
+}
+
+.knock-banner {
+  animation: knockSlide 3.6s ease forwards;
+}
+
+.showdown-panel {
+  animation: fadeScaleIn 0.3s ease both;
+}
+
+.badge-fade {
+  animation: badgeFade 0.15s ease both;
+}
+
+.btn-tap:active {
+  animation: btnTap 0.1s ease;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 2px; }
