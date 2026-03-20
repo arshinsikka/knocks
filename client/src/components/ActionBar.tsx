@@ -67,13 +67,17 @@ export default function ActionBar({
   isMyTurn, turnPhase, serverPhase, waitingFor,
   myName, playerChoices, emitIn, emitOut, emitJoin, emitPass,
 }: Props) {
-  // Prevent double-clicks: disable all buttons immediately after any action,
-  // re-enable when isMyTurn transitions away (next player's turn) or on error.
+  // Prevent double-clicks: disable all buttons immediately after any action.
+  // Reset when isMyTurn or turnPhase changes — the turnPhase change is critical:
+  // when P2 clicks OUT and immediately becomes the challenge actor, isMyTurn stays
+  // true but turnPhase flips from 'in_out' → 'challenge_join', which must reset
+  // the guard so the Join/Pass buttons are not permanently disabled.
   const [acted, setActed] = useState(false);
 
   useEffect(() => {
-    if (!isMyTurn) setActed(false);
-  }, [isMyTurn]);
+    console.log('[ActionBar] phase change → reset acted. isMyTurn:', isMyTurn, 'turnPhase:', turnPhase);
+    setActed(false);
+  }, [isMyTurn, turnPhase]);
 
   // Re-enable buttons if the server sends back an error (e.g. invalid action).
   useEffect(() => {
@@ -85,12 +89,13 @@ export default function ActionBar({
 
   function act(label: string, fn: () => void) {
     if (acted) return;
-    console.log('[ActionBar] clicked:', label);
+    console.log('[ActionBar] clicked:', label, '→ emitting');
     setActed(true);
     fn();
   }
 
   const myChoice = playerChoices[myName];
+  console.log('[ActionBar] render | isMyTurn:', isMyTurn, '| turnPhase:', turnPhase, '| serverPhase:', serverPhase, '| acted:', acted, '| myChoice:', myChoice);
 
   let content: React.ReactNode;
 

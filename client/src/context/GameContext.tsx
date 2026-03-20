@@ -136,10 +136,13 @@ export function GameProvider({
     const onCardsDealt = (d: { round: number; cards: Card[] }) =>
       patch({ myCards: d.cards });
 
-    const onYourTurn = (d: { phase: 'in_out' | 'challenge_join' }) =>
+    const onYourTurn = (d: { phase: 'in_out' | 'challenge_join' }) => {
+      console.log('[GameContext] your_turn received:', d);
       patch({ isMyTurn: true, turnPhase: d.phase, waitingFor: null });
+    };
 
-    const onWaitingFor = (d: { playerName: string; phase: string }) =>
+    const onWaitingFor = (d: { playerName: string; phase: string }) => {
+      console.log('[GameContext] waiting_for received:', d);
       setState((prev) => {
         const myName = prev.players.find((p) => p.id === prev.myId)?.name;
         // Keep serverPhase in sync — the server never sends a dedicated
@@ -157,6 +160,7 @@ export function GameProvider({
           isMyTurn: myName === d.playerName ? prev.isMyTurn : false,
         };
       });
+    };
 
     const onPlayerActed = (d: { playerName: string; action: PlayerAction }) => {
       setState((prev) => ({
@@ -255,10 +259,10 @@ export function GameProvider({
   return (
     <GameContext.Provider value={{
       ...state,
-      emitIn:  useCallback(() => getSocket().emit('action_in'),   []),
-      emitOut: useCallback(() => getSocket().emit('action_out'),  []),
-      emitJoin: useCallback(() => getSocket().emit('action_join'), []),
-      emitPass: useCallback(() => getSocket().emit('action_pass'), []),
+      emitIn:  useCallback(() => { console.log('[GameContext] emit action_in');   getSocket().emit('action_in');   }, []),
+      emitOut: useCallback(() => { console.log('[GameContext] emit action_out');  getSocket().emit('action_out');  }, []),
+      emitJoin: useCallback(() => { console.log('[GameContext] emit action_join'); getSocket().emit('action_join'); }, []),
+      emitPass: useCallback(() => { console.log('[GameContext] emit action_pass'); getSocket().emit('action_pass'); }, []),
       dismissShowdown: useCallback(() => patch({ showdownData: null }), [patch]),
       dismissKnock:    useCallback(() => patch({ latestKnock: null }),   [patch]),
     }}>

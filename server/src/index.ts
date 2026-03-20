@@ -26,6 +26,9 @@ interface RoomState {
 
 const rooms = new Map<string, RoomState>();
 const activeGames = new Map<string, GameRoom>(); // roomCode → GameRoom
+const turnTimers = new Map<string, ReturnType<typeof setTimeout>>(); // roomCode → timer
+
+const TURN_TIMEOUT_MS = 15_000;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +80,48 @@ function getWaitingInfo(game: GameRoom): { playerName: string; phase: string } |
   return null;
 }
 
+// ── Turn timeout helpers ──────────────────────────────────────────────────────
+
+function clearTurnTimer(roomCode: string) {
+  const t = turnTimers.get(roomCode);
+  if (t) { clearTimeout(t); turnTimers.delete(roomCode); }
+}
+
+function startTurnTimer(
+  io: Server,
+  game: GameRoom,
+  roomCode: string,
+  player: GamePlayer,
+  phase: 'in_out' | 'challenge_join',
+) {
+  clearTurnTimer(roomCode);
+  const t = setTimeout(() => {
+    turnTimers.delete(roomCode);
+    const s = game.getState();
+    // Guard: phase may have already advanced (race with manual action)
+    const expectedPhase = phase === 'in_out' ? 'IN_OUT' : 'CHALLENGE_JOIN';
+    if (s.phase !== expectedPhase) return;
+
+    const defaultAction = phase === 'in_out' ? 'out' : 'pass';
+    console.log(`[timeout] Auto-${defaultAction.toUpperCase()} for "${player.name}" in ${roomCode}`);
+
+    if (phase === 'in_out') {
+      const ok = game.submitInOut(player.id, 'out');
+      if (!ok) return;
+      touchRoom(roomCode);
+      io.to(roomCode).emit('player_acted', { playerName: player.name, action: 'out' });
+      afterInOut(io, game, roomCode);
+    } else {
+      const ok = game.submitJoinPass(player.id, 'pass');
+      if (!ok) return;
+      touchRoom(roomCode);
+      io.to(roomCode).emit('player_acted', { playerName: player.name, action: 'pass' });
+      afterChallengeJoin(io, game, roomCode);
+    }
+  }, TURN_TIMEOUT_MS);
+  turnTimers.set(roomCode, t);
+}
+
 // ── Game event emitters ───────────────────────────────────────────────────────
 
 function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
@@ -104,12 +149,15 @@ function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   // First actor
   const actor = game.currentActor();
   if (actor) {
+    console.log(`[turn] ${roomCode} IN_OUT → "${actor.name}" (${actor.socketId})`);
     io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
     io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'in_out' });
+    startTurnTimer(io, game, roomCode, actor, 'in_out');
   }
 }
 
 function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
+  clearTurnTimer(roomCode);
   const summary = game.resolveRound();
   const s = game.getState();
 
@@ -201,22 +249,28 @@ function afterInOut(io: Server, game: GameRoom, roomCode: string) {
 
   if (s.phase === 'ROUND_END') {
     // All players said OUT — no showdown
+    clearTurnTimer(roomCode);
     resolveAndEmit(io, game, roomCode);
   } else if (s.phase === 'SHOWDOWN') {
     // All players said IN — skip challenge window
+    clearTurnTimer(roomCode);
     resolveAndEmit(io, game, roomCode);
   } else if (s.phase === 'CHALLENGE_JOIN') {
     const actor = game.currentChallengeJoinActor();
     if (actor) {
+      console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
       io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
+      startTurnTimer(io, game, roomCode, actor, 'challenge_join');
     }
   } else {
     // Still IN_OUT
     const actor = game.currentActor();
     if (actor) {
+      console.log(`[turn] ${roomCode} IN_OUT → "${actor.name}" (${actor.socketId})`);
       io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'in_out' });
+      startTurnTimer(io, game, roomCode, actor, 'in_out');
     }
   }
 }
@@ -225,13 +279,16 @@ function afterChallengeJoin(io: Server, game: GameRoom, roomCode: string) {
   const s = game.getState();
 
   if (s.phase === 'SHOWDOWN') {
+    clearTurnTimer(roomCode);
     resolveAndEmit(io, game, roomCode);
   } else {
     // Still CHALLENGE_JOIN — more OUT players to answer
     const actor = game.currentChallengeJoinActor();
     if (actor) {
+      console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
       io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
+      startTurnTimer(io, game, roomCode, actor, 'challenge_join');
     }
   }
 }
@@ -368,6 +425,7 @@ io.on('connection', (socket: Socket) => {
     console.log(`[action_in] player="${player.name}" phase=${game.getState().phase} turn=${game.getState().players[game.getState().currentTurnIndex]?.name}`);
     if (game.getState().phase !== 'IN_OUT') return;
 
+    clearTurnTimer(code);
     const ok = game.submitInOut(player.id, 'in');
     if (!ok) { console.log(`[action_in] submitInOut rejected for player="${player.name}"`); return; }
 
@@ -385,6 +443,7 @@ io.on('connection', (socket: Socket) => {
     console.log(`[action_out] player="${player.name}" phase=${game.getState().phase} turn=${game.getState().players[game.getState().currentTurnIndex]?.name}`);
     if (game.getState().phase !== 'IN_OUT') return;
 
+    clearTurnTimer(code);
     const ok = game.submitInOut(player.id, 'out');
     if (!ok) { console.log(`[action_out] submitInOut rejected for player="${player.name}"`); return; }
 
@@ -408,6 +467,7 @@ io.on('connection', (socket: Socket) => {
       socket.emit('error', { message: 'Not in challenge phase' });
       return;
     }
+    clearTurnTimer(code);
     const ok = game.submitJoinPass(player.id, 'join');
     if (!ok) {
       console.log(`[action_join] rejected for player="${player.name}"`);
@@ -434,6 +494,7 @@ io.on('connection', (socket: Socket) => {
       socket.emit('error', { message: 'Not in challenge phase' });
       return;
     }
+    clearTurnTimer(code);
     const ok = game.submitJoinPass(player.id, 'pass');
     if (!ok) {
       console.log(`[action_pass] rejected for player="${player.name}"`);
