@@ -19,6 +19,7 @@ interface RoomState {
   players: LobbyPlayer[];
   knockTarget: 5 | 6;
   gameStarted: boolean;
+  lastActivity: number; // Date.now() ms
 }
 
 // ── Maps ─────────────────────────────────────────────────────────────────────
@@ -47,6 +48,11 @@ function findGameBySocket(socketId: string): [string, GameRoom, GamePlayer] | nu
     if (p) return [code, game, p];
   }
   return null;
+}
+
+function touchRoom(code: string) {
+  const r = rooms.get(code);
+  if (r) r.lastActivity = Date.now();
 }
 
 function publicPlayers(game: GameRoom) {
@@ -183,6 +189,9 @@ function afterInOut(io: Server, game: GameRoom, roomCode: string) {
   if (s.phase === 'ROUND_END') {
     // All players said OUT — no showdown
     resolveAndEmit(io, game, roomCode);
+  } else if (s.phase === 'SHOWDOWN') {
+    // All players said IN — skip challenge window
+    resolveAndEmit(io, game, roomCode);
   } else if (s.phase === 'CHALLENGE_JOIN') {
     const actor = game.currentChallengeJoinActor();
     if (actor) {
@@ -216,13 +225,21 @@ function afterChallengeJoin(io: Server, game: GameRoom, roomCode: string) {
 
 // ── Express + Socket.IO ───────────────────────────────────────────────────────
 
+const PORT       = process.env.PORT       ? Number(process.env.PORT) : 3001;
+const CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:3000';
+
 const app = express();
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: CLIENT_URL }));
+app.use(express.json());
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', activeRooms: rooms.size });
+});
 
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: 'http://localhost:3000', methods: ['GET', 'POST'] },
+  cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
 io.on('connection', (socket: Socket) => {
@@ -241,6 +258,7 @@ io.on('connection', (socket: Socket) => {
         players: [{ id: socket.id, name: playerName.trim() }],
         knockTarget,
         gameStarted: false,
+        lastActivity: Date.now(),
       });
       socket.join(code);
 
@@ -267,6 +285,7 @@ io.on('connection', (socket: Socket) => {
 
       const player = { id: socket.id, name: playerName.trim() };
       room.players.push(player);
+      room.lastActivity = Date.now();
       socket.join(room.code);
 
       socket.emit('room_joined', {
@@ -294,6 +313,7 @@ io.on('connection', (socket: Socket) => {
     if (room.players.length < 2) { socket.emit('error', { message: 'Need at least 2 players' }); return; }
 
     room.gameStarted = true;
+    room.lastActivity = Date.now();
 
     const game = new GameRoom(
       roomCode,
@@ -323,6 +343,7 @@ io.on('connection', (socket: Socket) => {
     const ok = game.submitInOut(player.id, 'in');
     if (!ok) return;
 
+    touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'in' });
     afterInOut(io, game, code);
   });
@@ -337,6 +358,7 @@ io.on('connection', (socket: Socket) => {
     const ok = game.submitInOut(player.id, 'out');
     if (!ok) return;
 
+    touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'out' });
     afterInOut(io, game, code);
   });
@@ -351,6 +373,7 @@ io.on('connection', (socket: Socket) => {
     const ok = game.submitJoinPass(player.id, 'join');
     if (!ok) return;
 
+    touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'join' });
     afterChallengeJoin(io, game, code);
   });
@@ -365,8 +388,42 @@ io.on('connection', (socket: Socket) => {
     const ok = game.submitJoinPass(player.id, 'pass');
     if (!ok) return;
 
+    touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'pass' });
     afterChallengeJoin(io, game, code);
+  });
+
+  // ── GAME: rejoin_game (reconnect with new socketId) ──────────────────────────
+  socket.on('rejoin_game', ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
+    const game = activeGames.get(roomCode?.toUpperCase());
+    if (!game) { socket.emit('error', { message: 'Game not found' }); return; }
+
+    const s = game.getState();
+    const player = s.players.find((p) => p.name === playerName);
+    if (!player) { socket.emit('error', { message: 'Player not in game' }); return; }
+
+    // Re-associate socket
+    (player as GamePlayer).socketId = socket.id;
+    socket.join(roomCode);
+
+    const room = rooms.get(roomCode);
+    if (room) {
+      const lp = room.players.find((p) => p.name === playerName);
+      if (lp) lp.id = socket.id;
+      room.lastActivity = Date.now();
+    }
+
+    socket.emit('state_snapshot', {
+      orbit: s.orbit,
+      round: s.round,
+      potTotal: s.potTotal,
+      phase: s.phase,
+      knockTarget: s.knockTarget,
+      players: publicPlayers(game),
+      myCards: player.cards,
+    });
+
+    console.log(`"${playerName}" rejoined ${roomCode}`);
   });
 
   // ── GAME: request_state (reconnect) ─────────────────────────────────────────
@@ -414,7 +471,36 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
-httpServer.listen(PORT, () => {
-  console.log(`\nKnocks server → http://localhost:${PORT}\n`);
+// ── Room cleanup (every 5 min, expire after 30 min idle) ─────────────────────
+
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const ROOM_TTL_MS         = 30 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of rooms) {
+    if (now - room.lastActivity > ROOM_TTL_MS) {
+      rooms.delete(code);
+      activeGames.delete(code);
+      console.log(`Room ${code} expired (idle > 30 min)`);
+    }
+  }
+}, CLEANUP_INTERVAL_MS);
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`\nKnocks server → http://0.0.0.0:${PORT}  (CLIENT_URL: ${CLIENT_URL})\n`);
+});
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received — shutting down gracefully');
+  io.close(() => {
+    httpServer.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
 });

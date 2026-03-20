@@ -12,6 +12,7 @@ import PlayerSlot     from '@/components/PlayerSlot';
 import ShowdownOverlay, { ShowdownToast } from '@/components/ShowdownOverlay';
 import KnockBanner    from '@/components/KnockBanner';
 import GameOverScreen from '@/components/GameOverScreen';
+import ReconnectBanner from '@/components/ReconnectBanner';
 
 // ── Player Ring ───────────────────────────────────────────────────────────────
 
@@ -392,6 +393,7 @@ export default function RoomPage() {
 
   return (
     <GameProvider knockTarget={session.knockTarget}>
+      <ReconnectBanner roomCode={code} playerName={session.playerName} />
       <GameBoard roomCode={code} />
     </GameProvider>
   );
