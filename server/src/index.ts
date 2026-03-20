@@ -382,14 +382,25 @@ io.on('connection', (socket: Socket) => {
 
   // ── GAME: action_join ───────────────────────────────────────────────────────
   socket.on('action_join', () => {
+    console.log(`[action_join] socket=${socket.id}`);
     const found = findGameBySocket(socket.id);
-    if (!found) return;
+    if (!found) {
+      console.log(`[action_join] no game found for socket=${socket.id}`);
+      socket.emit('error', { message: 'Not in a game' });
+      return;
+    }
     const [code, game, player] = found;
-    if (game.getState().phase !== 'CHALLENGE_JOIN') return;
-
+    console.log(`[action_join] player="${player.name}" phase=${game.getState().phase} currentActor=${game.currentChallengeJoinActor()?.name}`);
+    if (game.getState().phase !== 'CHALLENGE_JOIN') {
+      socket.emit('error', { message: 'Not in challenge phase' });
+      return;
+    }
     const ok = game.submitJoinPass(player.id, 'join');
-    if (!ok) return;
-
+    if (!ok) {
+      console.log(`[action_join] rejected for player="${player.name}"`);
+      socket.emit('error', { message: 'Not your turn to challenge' });
+      return;
+    }
     touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'join' });
     afterChallengeJoin(io, game, code);
@@ -397,14 +408,25 @@ io.on('connection', (socket: Socket) => {
 
   // ── GAME: action_pass ───────────────────────────────────────────────────────
   socket.on('action_pass', () => {
+    console.log(`[action_pass] socket=${socket.id}`);
     const found = findGameBySocket(socket.id);
-    if (!found) return;
+    if (!found) {
+      console.log(`[action_pass] no game found for socket=${socket.id}`);
+      socket.emit('error', { message: 'Not in a game' });
+      return;
+    }
     const [code, game, player] = found;
-    if (game.getState().phase !== 'CHALLENGE_JOIN') return;
-
+    console.log(`[action_pass] player="${player.name}" phase=${game.getState().phase} currentActor=${game.currentChallengeJoinActor()?.name}`);
+    if (game.getState().phase !== 'CHALLENGE_JOIN') {
+      socket.emit('error', { message: 'Not in challenge phase' });
+      return;
+    }
     const ok = game.submitJoinPass(player.id, 'pass');
-    if (!ok) return;
-
+    if (!ok) {
+      console.log(`[action_pass] rejected for player="${player.name}"`);
+      socket.emit('error', { message: 'Not your turn to pass' });
+      return;
+    }
     touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'pass' });
     afterChallengeJoin(io, game, code);

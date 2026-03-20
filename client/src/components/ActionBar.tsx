@@ -1,18 +1,20 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PlayerAction } from '@/context/GameContext';
+import { getSocket } from '@/lib/socket';
 
 interface Props {
-  isMyTurn:     boolean;
-  turnPhase:    'in_out' | 'challenge_join' | null;
-  serverPhase:  string;
-  waitingFor:   { playerName: string; phase: string } | null;
-  myName:       string;
+  isMyTurn:      boolean;
+  turnPhase:     'in_out' | 'challenge_join' | null;
+  serverPhase:   string;
+  waitingFor:    { playerName: string; phase: string } | null;
+  myName:        string;
   playerChoices: Record<string, PlayerAction>;
-  emitIn:       () => void;
-  emitOut:      () => void;
-  emitJoin:     () => void;
-  emitPass:     () => void;
+  emitIn:        () => void;
+  emitOut:       () => void;
+  emitJoin:      () => void;
+  emitPass:      () => void;
 }
 
 function Btn({
@@ -20,7 +22,7 @@ function Btn({
 }: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }) {
   return (
     <button
-      onClick={() => { console.log('[ActionBar] clicked:', label); onClick(); }}
+      onClick={onClick}
       disabled={disabled}
       className="btn-tap"
       style={{
@@ -34,8 +36,8 @@ function Btn({
         background: primary ? 'var(--border-medium)' : 'transparent',
         color: primary ? 'var(--text-primary)' : 'var(--text-muted)',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        transition: 'background 150ms ease-out, border-color 150ms ease-out',
+        opacity: disabled ? 0.35 : 1,
+        transition: 'background 150ms ease-out, border-color 150ms ease-out, opacity 150ms ease-out',
         fontFamily: 'var(--font-outfit), sans-serif',
       }}
       onMouseEnter={(e) => {
@@ -65,6 +67,29 @@ export default function ActionBar({
   isMyTurn, turnPhase, serverPhase, waitingFor,
   myName, playerChoices, emitIn, emitOut, emitJoin, emitPass,
 }: Props) {
+  // Prevent double-clicks: disable all buttons immediately after any action,
+  // re-enable when isMyTurn transitions away (next player's turn) or on error.
+  const [acted, setActed] = useState(false);
+
+  useEffect(() => {
+    if (!isMyTurn) setActed(false);
+  }, [isMyTurn]);
+
+  // Re-enable buttons if the server sends back an error (e.g. invalid action).
+  useEffect(() => {
+    const socket = getSocket();
+    const onError = () => { console.log('[ActionBar] server error — re-enabling buttons'); setActed(false); };
+    socket.on('error', onError);
+    return () => { socket.off('error', onError); };
+  }, []);
+
+  function act(label: string, fn: () => void) {
+    if (acted) return;
+    console.log('[ActionBar] clicked:', label);
+    setActed(true);
+    fn();
+  }
+
   const myChoice = playerChoices[myName];
 
   let content: React.ReactNode;
@@ -72,15 +97,15 @@ export default function ActionBar({
   if (isMyTurn && turnPhase === 'in_out') {
     content = (
       <>
-        <Btn label="In"  onClick={emitIn}  primary />
-        <Btn label="Out" onClick={emitOut} />
+        <Btn label="In"  onClick={() => act('In',  emitIn)}  primary disabled={acted} />
+        <Btn label="Out" onClick={() => act('Out', emitOut)}         disabled={acted} />
       </>
     );
   } else if (isMyTurn && turnPhase === 'challenge_join') {
     content = (
       <>
-        <Btn label="Join Challenge" onClick={emitJoin} primary />
-        <Btn label="Pass"           onClick={emitPass} />
+        <Btn label="Join Challenge" onClick={() => act('Join Challenge', emitJoin)} primary disabled={acted} />
+        <Btn label="Pass"           onClick={() => act('Pass',           emitPass)}         disabled={acted} />
       </>
     );
   } else if (serverPhase === 'IN_OUT') {
@@ -105,15 +130,15 @@ export default function ActionBar({
 
   return (
     <div style={{
-      position:       'relative',   /* required for zIndex to take effect */
-      background:     'var(--bg-primary)',
-      borderTop:      '1px solid var(--border-subtle)',
-      padding:        '12px 16px',
-      paddingBottom:  'max(12px, env(safe-area-inset-bottom))',
-      display:        'flex',
-      alignItems:     'center',
-      gap:            8,
-      zIndex:         50,
+      position:      'relative',
+      background:    'var(--bg-primary)',
+      borderTop:     '1px solid var(--border-subtle)',
+      padding:       '12px 16px',
+      paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+      display:       'flex',
+      alignItems:    'center',
+      gap:           8,
+      zIndex:        50,
     }}>
       {content}
     </div>

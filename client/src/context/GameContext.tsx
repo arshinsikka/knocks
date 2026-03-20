@@ -141,9 +141,16 @@ export function GameProvider({
     const onWaitingFor = (d: { playerName: string; phase: string }) =>
       setState((prev) => {
         const myName = prev.players.find((p) => p.id === prev.myId)?.name;
+        // Keep serverPhase in sync — the server never sends a dedicated
+        // phase-change event for CHALLENGE_JOIN, so we derive it here.
+        const newServerPhase =
+          d.phase === 'challenge_join' ? 'CHALLENGE_JOIN'
+          : d.phase === 'in_out'       ? 'IN_OUT'
+          : prev.serverPhase;
         return {
           ...prev,
           waitingFor: d,
+          serverPhase: newServerPhase,
           // The active player also receives waiting_for (room broadcast).
           // Don't clear isMyTurn if it's actually our turn.
           isMyTurn: myName === d.playerName ? prev.isMyTurn : false,
