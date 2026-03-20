@@ -139,7 +139,16 @@ export function GameProvider({
       patch({ isMyTurn: true, turnPhase: d.phase, waitingFor: null });
 
     const onWaitingFor = (d: { playerName: string; phase: string }) =>
-      patch({ isMyTurn: false, waitingFor: d });
+      setState((prev) => {
+        const myName = prev.players.find((p) => p.id === prev.myId)?.name;
+        return {
+          ...prev,
+          waitingFor: d,
+          // The active player also receives waiting_for (room broadcast).
+          // Don't clear isMyTurn if it's actually our turn.
+          isMyTurn: myName === d.playerName ? prev.isMyTurn : false,
+        };
+      });
 
     const onPlayerActed = (d: { playerName: string; action: PlayerAction }) => {
       setState((prev) => ({

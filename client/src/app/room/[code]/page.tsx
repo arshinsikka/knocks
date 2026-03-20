@@ -25,13 +25,13 @@ function PlayerRing() {
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
-      padding: '16px 12px 12px',
-      gap: 12, overflow: 'hidden',
+      justifyContent: 'center', alignItems: 'center',
+      padding: '12px', gap: 24, overflow: 'hidden',
     }}>
-      {/* Opponents — top area, auto-wrap */}
+      {/* Opponents */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 8,
-        justifyContent: 'center', alignContent: 'flex-start',
+        justifyContent: 'center', alignContent: 'center',
       }}>
         {opponents.map((p) => (
           <PlayerSlot
@@ -45,20 +45,15 @@ function PlayerRing() {
         ))}
       </div>
 
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
-
-      {/* My slot — bottom */}
+      {/* My slot */}
       {me && (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <PlayerSlot
-            player={me}
-            knockTarget={knockTarget}
-            isMe
-            isActiveTurn={false}
-            choice={playerChoices[me.name]}
-          />
-        </div>
+        <PlayerSlot
+          player={me}
+          knockTarget={knockTarget}
+          isMe
+          isActiveTurn={false}
+          choice={playerChoices[me.name]}
+        />
       )}
     </div>
   );
@@ -83,7 +78,7 @@ function GameBoard({ roomCode }: { roomCode: string }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateRows: '80px 1fr 120px calc(80px + env(safe-area-inset-bottom, 0px))',
+      gridTemplateRows: 'calc(64px + env(safe-area-inset-top, 0px)) 1fr 100px calc(80px + env(safe-area-inset-bottom, 0px))',
       height: '100dvh',
       maxWidth: 480,
       margin: '0 auto',

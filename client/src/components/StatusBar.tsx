@@ -36,13 +36,15 @@ export default function StatusBar({ roomCode, orbit, round, potTotal, payout, se
 
   return (
     <div style={{
-      height: 80,
       background: 'var(--bg-surface)',
       borderBottom: '1px solid var(--border-subtle)',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-around',
-      padding: '0 16px',
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingLeft: 16,
+      paddingRight: 16,
+      paddingBottom: 0,
     }}>
       {/* Row 1: room code + badge */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
