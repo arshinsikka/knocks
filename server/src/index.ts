@@ -225,11 +225,24 @@ function afterChallengeJoin(io: Server, game: GameRoom, roomCode: string) {
 
 // ── Express + Socket.IO ───────────────────────────────────────────────────────
 
-const PORT       = process.env.PORT       ? Number(process.env.PORT) : 3001;
-const CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:3000';
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  const allowed = (process.env.CLIENT_URL || 'http://localhost:3000').split(',').map((s) => s.trim());
+  return allowed.includes(origin) || origin.endsWith('.vercel.app');
+}
+
+const corsOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (isAllowedOrigin(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error('CORS not allowed'));
+  }
+};
 
 const app = express();
-app.use(cors({ origin: CLIENT_URL }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
@@ -239,7 +252,7 @@ app.get('/health', (_req, res) => {
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
+  cors: { origin: corsOrigin, methods: ['GET', 'POST'] },
 });
 
 io.on('connection', (socket: Socket) => {
@@ -490,7 +503,7 @@ setInterval(() => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`\nKnocks server → http://0.0.0.0:${PORT}  (CLIENT_URL: ${CLIENT_URL})\n`);
+  console.log(`\nKnocks server → http://0.0.0.0:${PORT}  (CLIENT_URL: ${process.env.CLIENT_URL ?? 'http://localhost:3000'})\n`);
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
