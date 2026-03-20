@@ -1,7 +1,9 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import Card from './Card';
 import { Card as CardType } from '@/context/GameContext';
+import { sounds } from '@/lib/sounds';
 
 interface Props {
   cards: CardType[];
@@ -11,6 +13,23 @@ export default function HandTray({ cards }: Props) {
   const count = cards.length;
   const overlapping = count >= 4;
   const overlapMargin = count === 5 ? -10 : -8;
+
+  // Play deal sound for each newly arrived card with slight stagger + pitch variation
+  const prevCountRef = useRef(0);
+  useEffect(() => {
+    if (count > prevCountRef.current) {
+      const newCards = count - prevCountRef.current;
+      for (let i = 0; i < newCards; i++) {
+        const pitchMod = 0.85 + Math.random() * 0.3;
+        if (i === 0) {
+          sounds.deal(pitchMod);
+        } else {
+          setTimeout(() => sounds.deal(pitchMod), i * 70);
+        }
+      }
+    }
+    prevCountRef.current = count;
+  }, [count]);
 
   return (
     <div style={{

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PlayerAction } from '@/context/GameContext';
 import { getSocket } from '@/lib/socket';
+import { sounds } from '@/lib/sounds';
 
 const TURN_SECS = 15;
 
@@ -138,10 +139,20 @@ export default function ActionBar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeActor]);
 
+  // Timer warning tick — plays for both active player and observers
+  useEffect(() => {
+    if (countdown > 0 && countdown <= 5 && activeActor) {
+      sounds.timerTick(countdown);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
+
   function act(label: string, fn: () => void) {
     if (acted) return;
     console.log('[ActionBar] clicked:', label, '→ emitting');
     setActed(true);
+    sounds.click();
+    sounds.vibrate(10);
     fn();
   }
 

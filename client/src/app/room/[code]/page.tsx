@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 import { GameProvider, useGame, PublicPlayer } from '@/context/GameContext';
@@ -13,6 +13,7 @@ import ShowdownOverlay, { ShowdownToast } from '@/components/ShowdownOverlay';
 import KnockBanner    from '@/components/KnockBanner';
 import GameOverScreen from '@/components/GameOverScreen';
 import ReconnectBanner from '@/components/ReconnectBanner';
+import { sounds } from '@/lib/sounds';
 
 // ── Player Ring ───────────────────────────────────────────────────────────────
 
@@ -72,6 +73,57 @@ function GameBoard({ roomCode }: { roomCode: string }) {
   } = useGame();
 
   const myName = players.find((p) => p.id === myId)?.name ?? '';
+
+  // ── Sound effects (all hooks before early return — React rules) ─────────────
+
+  // YOUR TURN — ping only when isMyTurn flips from false → true
+  const wasMyTurnRef = useRef(false);
+  useEffect(() => {
+    if (isMyTurn && !wasMyTurnRef.current) {
+      sounds.yourTurn();
+      sounds.vibrate(50);
+    }
+    wasMyTurnRef.current = isMyTurn;
+  }, [isMyTurn]);
+
+  // CHALLENGE — when server phase enters CHALLENGE_JOIN
+  const prevPhaseRef = useRef(serverPhase);
+  useEffect(() => {
+    if (serverPhase === 'CHALLENGE_JOIN' && prevPhaseRef.current !== 'CHALLENGE_JOIN') {
+      sounds.challenge();
+    }
+    prevPhaseRef.current = serverPhase;
+  }, [serverPhase]);
+
+  // SHOWDOWN REVEAL — when overlay opens for a participant
+  useEffect(() => {
+    if (showdownData && !showdownData.isPublic) {
+      sounds.showdown();
+    }
+  }, [showdownData]);
+
+  // KNOCK EARNED — when latestKnock arrives
+  useEffect(() => {
+    if (latestKnock) {
+      sounds.knock();
+      sounds.vibrate([50, 30, 50]);
+    }
+  }, [latestKnock]);
+
+  // GAME OVER — victory for winner, neutral for others
+  useEffect(() => {
+    if (gameOver) {
+      const amWinner = gameOver.winnerName === myName;
+      if (amWinner) {
+        sounds.gameOverWin();
+        sounds.vibrate([100, 50, 100, 50, 200]);
+      } else {
+        sounds.gameOverLose();
+      }
+    }
+  // myName is stable once the game starts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameOver]);
 
   if (gameOver) return <GameOverScreen data={gameOver} />;
 
