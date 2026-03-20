@@ -138,9 +138,9 @@ describe('Scenario 3: 1 IN + 1 joins challenge', () => {
   });
 });
 
-// ── Scenario 4: 3 IN players → showdown, 2 losers split ─────────────────────
+// ── Scenario 4: 3 IN players → showdown, only worst pays ─────────────────────
 describe('Scenario 4: 3 IN players', () => {
-  test('winner gets payout, two losers split; no knock from showdown', () => {
+  test('winner gets payout, only worst-hand player pays; middle player safe', () => {
     const { game, players } = makeRoom(3);
     game.startRound();
     // Round 1: pot = 6 (3×$2 orbit fee), each player balance = -2 after startRound
@@ -157,11 +157,19 @@ describe('Scenario 4: 3 IN players', () => {
     const ORBIT_FEE = 2;
     const s = game.getState();
     const winner = s.players.find(p => p.id === summary.winner)!;
-    const losers = s.players.filter(p => p.id !== summary.winner);
+    const payers = s.players.filter(p => summary.payerIds.includes(p.id));
+    const safePlayers = s.players.filter(p => summary.safeIds.includes(p.id));
+
     expect(winner.balance).toBe(summary.payout - ORBIT_FEE);
-    losers.forEach(l =>
-      expect(l.balance).toBeCloseTo(-(summary.payout / losers.length) - ORBIT_FEE),
+    // Only payers pay; safe players only have the orbit fee deducted
+    payers.forEach(p =>
+      expect(p.balance).toBeCloseTo(-(summary.payout / payers.length) - ORBIT_FEE),
     );
+    safePlayers.forEach(p =>
+      expect(p.balance).toBe(-ORBIT_FEE),
+    );
+    // With 3 players round 1, exactly 1 payer (worst card) and 1 safe (middle)
+    expect(payers.length + safePlayers.length + 1).toBe(3);
   });
 });
 
@@ -265,8 +273,13 @@ describe('Scenario 7: payout splitting with many players', () => {
     const s = game.getState();
     const winner = s.players.find(p => p.id === summary.winner)!;
     expect(winner.balance).toBe(12); // no orbit fee (round 3, not round 1)
-    const losers = s.players.filter(p => p.id !== summary.winner);
-    losers.forEach(l => expect(l.balance).toBeCloseTo(-12 / 5));
+    // Only the worst-hand player(s) pay; others are safe with balance 0
+    const payers = s.players.filter(p => summary.payerIds.includes(p.id));
+    const safePs = s.players.filter(p => summary.safeIds.includes(p.id));
+    // Total paid in = winner's gain
+    const totalPaid = payers.reduce((sum, p) => sum + Math.abs(p.balance), 0);
+    expect(totalPaid).toBeCloseTo(12);
+    safePs.forEach(p => expect(p.balance).toBe(0));
   });
 });
 

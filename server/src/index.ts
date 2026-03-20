@@ -175,8 +175,9 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
     const winnerPlayer = summary.winner
       ? s.players.find((p) => p.id === summary.winner) ?? null
       : null;
-    const losers = winnerPlayer ? participants.filter((p) => p.id !== summary.winner) : [];
-    const eachLoserPays = losers.length > 0 ? summary.payout / losers.length : 0;
+    const payerIdSet = new Set(summary.payerIds);
+    const numPayers = payerIdSet.size;
+    const eachPayerPays = numPayers > 0 ? summary.payout / numPayers : 0;
 
     // showdown_reveal → participants only
     const allHandsMap = new Map(
@@ -190,10 +191,13 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
           cards: pp.cards,
           bestHand: allHandsMap.get(pp.id),
           handType: allHandsMap.get(pp.id)?.type,
+          role: pp.id === summary.winner ? 'winner'
+              : payerIdSet.has(pp.id) ? 'payer'
+              : 'safe',
         })),
         winner: winnerPlayer?.name ?? null,
         payout: summary.payout,
-        eachLoserPays,
+        eachPayerPays,
         tie: summary.tie,
       });
     }
@@ -204,7 +208,7 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
         participantNames: participants.map((pp) => pp.name),
         winnerName: winnerPlayer?.name ?? null,
         payout: summary.payout,
-        eachLoserPays,
+        eachPayerPays,
         tie: summary.tie,
       });
     }

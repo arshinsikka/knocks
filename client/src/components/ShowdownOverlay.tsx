@@ -25,7 +25,10 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
     return () => clearInterval(interval);
   }, [onClose]);
 
-  const amIWinner = data.winner === myName;
+  const me = data.participants.find((p) => p.name === myName);
+  const myRole = me?.role ?? 'safe';
+
+  const payerCount = data.participants.filter((p) => p.role === 'payer').length;
 
   return (
     <div
@@ -66,14 +69,25 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
         {/* Participants */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
           {data.participants.map((p) => {
-            const isWinner = !data.tie && p.name === data.winner;
+            const isWinner = !data.tie && p.role === 'winner';
+            const isPayer  = !data.tie && p.role === 'payer';
+
+            let roleLabel: string | null = null;
+            if (!data.tie && !data.isPublic) {
+              if (isWinner)     roleLabel = `WON +$${data.payout}`;
+              else if (isPayer) roleLabel = `LOST -$${data.eachPayerPays}`;
+              else              roleLabel = 'SAFE';
+            } else if (!data.tie && data.isPublic && isWinner) {
+              roleLabel = 'WINNER';
+            }
+
             return (
               <div
                 key={p.name}
                 style={{
                   padding:    '10px 12px',
                   background: isWinner ? 'var(--accent-glow)' : 'transparent',
-                  borderLeft: `2px solid ${isWinner ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+                  borderLeft: `2px solid ${isWinner ? 'var(--border-bright)' : isPayer ? 'var(--color-red, #c0392b)' : 'var(--border-subtle)'}`,
                   borderRadius: 4,
                 }}
               >
@@ -86,12 +100,12 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
                     color: isWinner ? 'var(--text-primary)' : 'var(--text-secondary)',
                   }}>
                     {p.name}
-                    {isWinner && (
+                    {roleLabel && (
                       <span style={{
                         marginLeft: 8, fontSize: 9, letterSpacing: '0.1em',
-                        color: 'var(--text-muted)',
+                        color: isWinner ? 'var(--text-muted)' : isPayer ? 'var(--text-muted)' : 'var(--text-muted)',
                       }}>
-                        WINNER
+                        {roleLabel}
                       </span>
                     )}
                   </span>
@@ -135,22 +149,24 @@ export default function ShowdownOverlay({ data, myName, onClose }: Props) {
           ) : !data.isPublic ? (
             <p style={{
               fontSize: 15, fontWeight: 700,
-              color: amIWinner ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: myRole === 'winner' ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontFamily: 'var(--font-jetbrains-mono), monospace',
               marginBottom: 4,
             }}>
-              {amIWinner
-                ? `+$${data.payout} collected`
-                : `-$${data.eachLoserPays} paid`}
+              {myRole === 'winner'
+                ? `WON +$${data.payout}`
+                : myRole === 'payer'
+                ? `LOST -$${data.eachPayerPays}`
+                : 'SAFE'}
             </p>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               {data.winner} wins the showdown (+${data.payout})
             </p>
           )}
-          {!data.tie && data.participants.length > 2 && (
+          {!data.tie && !data.isPublic && payerCount > 1 && (
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              {data.participants.length - 1} losers &times; ${data.eachLoserPays} each
+              {payerCount} payers &times; ${data.eachPayerPays} each
             </p>
           )}
         </div>

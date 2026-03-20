@@ -46,6 +46,20 @@ function bestOf(
 }
 
 /**
+ * Returns the joker card for a Round 3 hand based on color composition:
+ * - 2 red + 1 black → the single black card is the joker
+ * - 2 black + 1 red → the single red card is the joker
+ * - 3 same color → no joker (returns null)
+ */
+export function findJoker(cards: [Card, Card, Card]): Card | null {
+  const reds = cards.filter(isRed);
+  const blacks = cards.filter(isBlack);
+  if (reds.length === 2 && blacks.length === 1) return blacks[0];
+  if (reds.length === 1 && blacks.length === 2) return reds[0];
+  return null;
+}
+
+/**
  * Returns ClassifiedHand (or a round-1 pseudo-hand with a single card).
  */
 export function getBestHand(
@@ -75,41 +89,41 @@ export function getBestHand(
     return bestOf(hands, 'normal', 2);
   }
 
-  // ── Round 3: 3 cards, possible wild ─────────────────────────────────────
+  // ── Round 3: 3 cards, joker determined by color composition ────────────
   if (round === 3) {
-    const [c0, c1, c2] = playerCards;
     const col = (c: Card) => `${c.rank}${c.suit[0].toUpperCase()}`;
     const colorStr = (c: Card) => (isRed(c) ? 'R' : 'B');
 
-    const hasWild =
-      (isRed(c0) && isRed(c1) && isBlack(c2)) ||
-      (isBlack(c0) && isBlack(c1) && isRed(c2));
+    const jokerCard = findJoker(playerCards as [Card, Card, Card]);
+    const realCards = jokerCard
+      ? playerCards.filter((c) => c !== jokerCard)
+      : playerCards;
 
     console.log(
-      `[R3] ${col(c0)} ${col(c1)} ${col(c2)}` +
-      ` (${colorStr(c0)}${colorStr(c1)}${colorStr(c2)})` +
-      ` → joker: ${hasWild}`,
+      `[R3] ${playerCards.map(col).join(' ')}` +
+      ` (${playerCards.map(colorStr).join('')})` +
+      ` → joker: ${jokerCard ? col(jokerCard) : 'none'}`,
     );
 
-    if (!hasWild) {
+    if (!jokerCard) {
       const hand = classifyHand(playerCards as [Card, Card, Card]);
       console.log(`[R3] no joker → ${hand.type}`);
       return hand;
     }
 
-    // c2 is wild — try ALL 52 possible substitutions (wild can be any card)
+    // Try ALL 52 possible cards as substitutions for the joker
     const deck = buildDeck();
     let bestHand: ClassifiedHand | null = null;
     let bestSub: Card | null = null;
     for (const sub of deck) {
-      const h = classifyHand([c0, c1, sub]);
+      const h = classifyHand([realCards[0], realCards[1], sub]);
       if (!bestHand || compareHands(h, bestHand, 'normal', 3) === 1) {
         bestHand = h;
         bestSub = sub;
       }
     }
     console.log(
-      `[R3] joker → best wild: ${col(bestSub!)} → ${bestHand!.type}`,
+      `[R3] joker ${col(jokerCard)} → best sub: ${col(bestSub!)} → ${bestHand!.type}`,
     );
     return bestHand!;
   }

@@ -13,6 +13,8 @@ export interface RoundSummary {
   knockAwarded: boolean;
   newKnocks: Record<string, number>;
   tie: boolean;
+  payerIds: string[];        // worst-hand player(s) who pay the winner
+  safeIds: string[];         // middle players who pay nothing
 }
 
 export interface GameRoomState {
@@ -213,6 +215,8 @@ export class GameRoom {
     let payout = 0;
     let knockAwarded = false;
     const newKnocks: Record<string, number> = {};
+    const payerIds: string[] = [];
+    const safeIds: string[] = [];
 
     if (participants.length === 0) {
       // No participants — no payout, no knock
@@ -232,17 +236,20 @@ export class GameRoom {
         s.allDealtCards,
       );
       if (!result.tie) {
-        // Clear winner — settle balances
+        // Clear winner — only payers (worst hand) pay; safe players unchanged
         winner = result.winner;
         payout = calculatePayout(s.orbit, s.potTotal);
         console.log(`SETTLE: Orbit ${s.orbit}, Pot ${s.potTotal}, Challenge Amount ${payout}`);
-        settleShowdown(winner!, result.losers, payout);
+        settleShowdown(winner!, result.payers, payout);
         // Track showdown breakdown stats
         winner!.showdownWinnings += payout;
-        const loserShare = result.losers.length > 0 ? payout / result.losers.length : 0;
-        for (const loser of result.losers) {
-          loser.showdownLosses -= loserShare;
+        const payerShare = result.payers.length > 0 ? payout / result.payers.length : 0;
+        for (const payer of result.payers) {
+          payer.showdownLosses -= payerShare;
         }
+        // Record payer/safe IDs for downstream emission
+        for (const id of result.payers.map((p) => p.id)) payerIds.push(id);
+        for (const id of result.safePlayers.map((p) => p.id)) safeIds.push(id);
       }
       // If tie: winner=null, payout=0, no balance changes
     }
@@ -261,6 +268,8 @@ export class GameRoom {
       knockAwarded,
       newKnocks,
       tie,
+      payerIds,
+      safeIds,
     };
 
     s.lastSummary = summary;

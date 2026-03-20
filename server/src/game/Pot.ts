@@ -11,15 +11,15 @@ export function calculatePayout(orbit: number, potTotal: number): number {
   return Math.min(potTotal, 12);
 }
 
-/** Debit each loser, credit winner. Mutates in place. */
+/** Debit each payer their share, credit winner the full payout. Mutates in place. */
 export function settleShowdown(
   winner: GamePlayer,
-  losers: GamePlayer[],
+  payers: GamePlayer[],
   payout: number,
 ): void {
-  const share = payout / losers.length;
-  for (const loser of losers) {
-    loser.balance -= share;
+  const share = payout / payers.length;
+  for (const payer of payers) {
+    payer.balance -= share;
   }
   winner.balance += payout;
 }

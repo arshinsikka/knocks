@@ -22,13 +22,14 @@ export interface ShowdownParticipant {
   name: string;
   cards: Card[];
   handType: string;
+  role: 'winner' | 'payer' | 'safe';
 }
 
 export interface ShowdownData {
   participants: ShowdownParticipant[];
   winner: string | null;
   payout: number;
-  eachLoserPays: number;
+  eachPayerPays: number;
   isPublic: boolean;
   tie: boolean;
 }
@@ -184,7 +185,7 @@ export function GameProvider({
 
     const onShowdownReveal = (d: {
       participants: ShowdownParticipant[];
-      winner: string | null; payout: number; eachLoserPays: number; tie?: boolean;
+      winner: string | null; payout: number; eachPayerPays: number; tie?: boolean;
     }) => patch({
       isMyTurn: false, turnPhase: null,
       showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
@@ -193,13 +194,13 @@ export function GameProvider({
 
     const onShowdownPublic = (d: {
       participantNames: string[]; winnerName: string | null;
-      payout: number; eachLoserPays: number; tie?: boolean;
+      payout: number; eachPayerPays: number; tie?: boolean;
     }) => patch({
       isMyTurn: false, turnPhase: null,
       showdownData: {
-        participants: d.participantNames.map((name) => ({ name, cards: [], handType: '' })),
+        participants: d.participantNames.map((name) => ({ name, cards: [], handType: '', role: 'safe' as const })),
         winner: d.winnerName, payout: d.payout,
-        eachLoserPays: d.eachLoserPays, isPublic: true, tie: d.tie ?? false,
+        eachPayerPays: d.eachPayerPays, isPublic: true, tie: d.tie ?? false,
       },
       serverPhase: 'SHOWDOWN',
     });
