@@ -20,7 +20,7 @@ function Btn({
 }: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }) {
   return (
     <button
-      onClick={onClick}
+      onClick={() => { console.log('[ActionBar] clicked:', label); onClick(); }}
       disabled={disabled}
       className="btn-tap"
       style={{
@@ -105,6 +105,7 @@ export default function ActionBar({
 
   return (
     <div style={{
+      position:       'relative',   /* required for zIndex to take effect */
       background:     'var(--bg-primary)',
       borderTop:      '1px solid var(--border-subtle)',
       padding:        '12px 16px',

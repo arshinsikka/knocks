@@ -14,7 +14,7 @@ export default function HandTray({ cards }: Props) {
 
   return (
     <div style={{
-      height: 100,
+      height: 120,
       background: 'var(--bg-elevated)',
       borderTop: '1px solid var(--border-subtle)',
       display: 'flex',

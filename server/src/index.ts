@@ -348,13 +348,15 @@ io.on('connection', (socket: Socket) => {
 
   // ── GAME: action_in ─────────────────────────────────────────────────────────
   socket.on('action_in', () => {
+    console.log(`[action_in] socket=${socket.id}`);
     const found = findGameBySocket(socket.id);
-    if (!found) return;
+    if (!found) { console.log(`[action_in] no game found for socket=${socket.id}`); return; }
     const [code, game, player] = found;
+    console.log(`[action_in] player="${player.name}" phase=${game.getState().phase} turn=${game.getState().players[game.getState().currentTurnIndex]?.name}`);
     if (game.getState().phase !== 'IN_OUT') return;
 
     const ok = game.submitInOut(player.id, 'in');
-    if (!ok) return;
+    if (!ok) { console.log(`[action_in] submitInOut rejected for player="${player.name}"`); return; }
 
     touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'in' });
@@ -363,13 +365,15 @@ io.on('connection', (socket: Socket) => {
 
   // ── GAME: action_out ────────────────────────────────────────────────────────
   socket.on('action_out', () => {
+    console.log(`[action_out] socket=${socket.id}`);
     const found = findGameBySocket(socket.id);
-    if (!found) return;
+    if (!found) { console.log(`[action_out] no game found for socket=${socket.id}`); return; }
     const [code, game, player] = found;
+    console.log(`[action_out] player="${player.name}" phase=${game.getState().phase} turn=${game.getState().players[game.getState().currentTurnIndex]?.name}`);
     if (game.getState().phase !== 'IN_OUT') return;
 
     const ok = game.submitInOut(player.id, 'out');
-    if (!ok) return;
+    if (!ok) { console.log(`[action_out] submitInOut rejected for player="${player.name}"`); return; }
 
     touchRoom(code);
     io.to(code).emit('player_acted', { playerName: player.name, action: 'out' });

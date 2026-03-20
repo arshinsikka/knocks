@@ -1,5 +1,5 @@
 import { Card, GamePhase, GamePlayer, ClassifiedHand } from './types';
-import { deal } from './Deck';
+import { buildDeck, shuffle } from './Deck';
 import { getBestHand } from './Rounds';
 import { resolveShowdown, ShowdownResult } from './Showdown';
 import { addOrbitContribution, calculatePayout, settleShowdown } from './Pot';
@@ -24,7 +24,8 @@ export interface GameRoomState {
   currentTurnIndex: number;
   players: GamePlayer[];
   potTotal: number;
-  allDealtCards: Card[];
+  orbitDeck: Card[];             // shuffled once per orbit, dealt 1 card/round
+  allDealtCards: Card[];         // accumulates across rounds within an orbit
   lastSummary: RoundSummary | null;
   gameOverWinner: string | null; // playerId
 }
@@ -58,6 +59,7 @@ export class GameRoom {
       currentTurnIndex: starterIndex,
       players,
       potTotal: 0,
+      orbitDeck: [],
       allDealtCards: [],
       lastSummary: null,
       gameOverWinner: null,
@@ -68,33 +70,48 @@ export class GameRoom {
     return this.state;
   }
 
-  /** Returns cards dealt to each player, keyed by playerId */
+  /**
+   * Returns the full accumulated hand for each player, keyed by playerId.
+   *
+   * Orbit round 1: shuffle a fresh deck, clear all hands, ante up.
+   * Rounds 2-5:    deal exactly 1 new card from the SAME orbit deck;
+   *               players accumulate cards (never replaced mid-orbit).
+   */
   startRound(): Map<string, Card[]> {
     const s = this.state;
     s.phase = 'DEALING';
 
-    // Orbit contribution on round 1 of each orbit
     if (s.round === 1) {
+      // New orbit: ante, fresh deck, clear hands
       s.potTotal = addOrbitContribution(s.potTotal, s.players.length);
+      s.orbitDeck = shuffle(buildDeck());
+      s.allDealtCards = [];
+      for (const p of s.players) {
+        p.cards = [];
+      }
     }
 
-    // Deal
-    const [hands, allDealt] = deal(s.round, s.players.length);
-    s.allDealtCards = allDealt;
+    // Deal exactly 1 new card per player from the persisted orbit deck
+    for (const p of s.players) {
+      const card = s.orbitDeck.pop()!;
+      p.cards.push(card);        // accumulate — never replace
+      s.allDealtCards.push(card);
+    }
 
-    for (let i = 0; i < s.players.length; i++) {
-      s.players[i].cards = hands[i];
-      s.players[i].bestHand = getBestHand(hands[i], s.round, allDealt);
-      s.players[i].choice = null;
+    // Evaluate best hand using the full accumulated hand
+    for (const p of s.players) {
+      p.bestHand = getBestHand(p.cards, s.round, s.allDealtCards);
+      p.choice = null;
     }
 
     // Reset turn to orbit starter
     s.currentTurnIndex = s.orbitStarterIndex;
     s.phase = 'IN_OUT';
 
+    // Send each player their full accumulated hand
     const dealt = new Map<string, Card[]>();
     for (const p of s.players) {
-      dealt.set(p.id, p.cards);
+      dealt.set(p.id, [...p.cards]);
     }
     return dealt;
   }

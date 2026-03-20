@@ -78,7 +78,7 @@ function GameBoard({ roomCode }: { roomCode: string }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateRows: 'calc(64px + env(safe-area-inset-top, 0px)) 1fr 100px calc(80px + env(safe-area-inset-bottom, 0px))',
+      gridTemplateRows: 'calc(80px + env(safe-area-inset-top, 0px)) 1fr 120px calc(80px + env(safe-area-inset-bottom, 0px))',
       height: '100dvh',
       maxWidth: 480,
       margin: '0 auto',
