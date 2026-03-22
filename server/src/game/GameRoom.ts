@@ -21,6 +21,7 @@ export interface GameRoomState {
   roomCode: string;
   knockTarget: 5 | 6;
   roundsPerOrbit: 5 | 6;
+  challengeLimit: 'none' | 12 | 18 | 24;
   phase: GamePhase;
   orbit: number;
   round: number;                 // 1-N (N = roundsPerOrbit)
@@ -42,6 +43,7 @@ export class GameRoom {
     playerInfos: Array<{ id: string; name: string; socketId: string }>,
     knockTarget: 5 | 6,
     roundsPerOrbit: 5 | 6 = 5,
+    challengeLimit: 'none' | 12 | 18 | 24 = 12,
   ) {
     const players: GamePlayer[] = playerInfos.map((p) => ({
       ...p,
@@ -62,6 +64,7 @@ export class GameRoom {
       roomCode,
       knockTarget,
       roundsPerOrbit,
+      challengeLimit,
       phase: 'LOBBY',
       orbit: 1,
       round: 1,
@@ -241,7 +244,7 @@ export class GameRoom {
       if (!result.tie) {
         // Clear winner — only payers (worst hand) pay; safe players unchanged
         winner = result.winner;
-        payout = calculatePayout(s.orbit, s.potTotal);
+        payout = calculatePayout(s.orbit, s.potTotal, s.challengeLimit);
         console.log(`SETTLE: Orbit ${s.orbit}, Pot ${s.potTotal}, Challenge Amount ${payout}`);
         settleShowdown(winner!, result.payers, payout);
         // Track showdown breakdown stats

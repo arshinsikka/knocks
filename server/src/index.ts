@@ -20,6 +20,7 @@ interface RoomState {
   players: LobbyPlayer[];
   knockTarget: 5 | 6;
   roundsPerOrbit: 5 | 6;
+  challengeLimit: 'none' | 12 | 18 | 24;
   gameStarted: boolean;
   lastActivity: number; // Date.now() ms
 }
@@ -132,7 +133,7 @@ function startTurnTimer(
 function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   const dealt = game.startRound();         // advances phase → IN_OUT
   const s = game.getState();
-  const payout = calculatePayout(s.orbit, s.potTotal);
+  const payout = calculatePayout(s.orbit, s.potTotal, s.challengeLimit);
   const starter = s.players[s.orbitStarterIndex];
 
   io.to(roomCode).emit('round_started', {
@@ -396,7 +397,10 @@ io.on('connection', (socket: Socket) => {
   // ── LOBBY: create_room ──────────────────────────────────────────────────────
   socket.on(
     'create_room',
-    ({ playerName, knockTarget, roundsPerOrbit = 5 }: { playerName: string; knockTarget: 5 | 6; roundsPerOrbit?: 5 | 6 }) => {
+    ({ playerName, knockTarget, roundsPerOrbit = 5, challengeLimit = 12 }: {
+      playerName: string; knockTarget: 5 | 6;
+      roundsPerOrbit?: 5 | 6; challengeLimit?: 'none' | 12 | 18 | 24;
+    }) => {
       if (!playerName?.trim()) { socket.emit('error', { message: 'Name required' }); return; }
 
       const code = uniqueCode();
@@ -406,6 +410,7 @@ io.on('connection', (socket: Socket) => {
         players: [{ id: socket.id, name: playerName.trim() }],
         knockTarget,
         roundsPerOrbit,
+        challengeLimit,
         gameStarted: false,
         lastActivity: Date.now(),
       });
@@ -415,6 +420,7 @@ io.on('connection', (socket: Socket) => {
         roomCode: code,
         knockTarget,
         roundsPerOrbit,
+        challengeLimit,
         players: rooms.get(code)!.players,
         hostId: socket.id,
       });
@@ -442,6 +448,7 @@ io.on('connection', (socket: Socket) => {
         roomCode: room.code,
         knockTarget: room.knockTarget,
         roundsPerOrbit: room.roundsPerOrbit,
+        challengeLimit: room.challengeLimit,
         players: room.players,
         hostId: room.hostId,
       });
@@ -471,6 +478,7 @@ io.on('connection', (socket: Socket) => {
       room.players.map((p) => ({ id: p.id, name: p.name, socketId: p.id })),
       room.knockTarget,
       room.roundsPerOrbit,
+      room.challengeLimit,
     );
     activeGames.set(roomCode, game);
 
@@ -478,6 +486,7 @@ io.on('connection', (socket: Socket) => {
       players: room.players,
       knockTarget: room.knockTarget,
       roundsPerOrbit: room.roundsPerOrbit,
+      challengeLimit: room.challengeLimit,
     });
 
     console.log(`[room] GAME STARTED in ${roomCode} (players: ${room.players.length})`);
@@ -631,7 +640,7 @@ io.on('connection', (socket: Socket) => {
       room.lastActivity = Date.now();
     }
 
-    const payout = calculatePayout(s.orbit, s.potTotal);
+    const payout = calculatePayout(s.orbit, s.potTotal, s.challengeLimit);
     const waitingInfo = getWaitingInfo(game);
 
     socket.emit('state_snapshot', {
@@ -642,6 +651,7 @@ io.on('connection', (socket: Socket) => {
       phase: s.phase,
       knockTarget: s.knockTarget,
       roundsPerOrbit: s.roundsPerOrbit,
+      challengeLimit: s.challengeLimit,
       players: publicPlayers(game),
       myCards: player.cards,
       selectedCards: player.bestHand?.cards ?? player.cards,
@@ -670,7 +680,7 @@ io.on('connection', (socket: Socket) => {
     const me = s.players.find((p) => p.socketId === socket.id);
     if (!me) return;
 
-    const payout = calculatePayout(s.orbit, s.potTotal);
+    const payout = calculatePayout(s.orbit, s.potTotal, s.challengeLimit);
     const waitingInfo = getWaitingInfo(game);
 
     socket.emit('state_snapshot', {
@@ -681,6 +691,7 @@ io.on('connection', (socket: Socket) => {
       phase: s.phase,
       knockTarget: s.knockTarget,
       roundsPerOrbit: s.roundsPerOrbit,
+      challengeLimit: s.challengeLimit,
       players: publicPlayers(game),
       myCards: me.cards,
       selectedCards: me.bestHand?.cards ?? me.cards,
@@ -713,6 +724,7 @@ io.on('connection', (socket: Socket) => {
       players: room.players,
       hostId: room.hostId,
       knockTarget: room.knockTarget,
+      challengeLimit: room.challengeLimit,
     });
 
     console.log(`[room] REMATCH started in ${roomCode}`);

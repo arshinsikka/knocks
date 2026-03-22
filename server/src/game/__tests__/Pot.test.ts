@@ -27,19 +27,37 @@ describe('addOrbitContribution', () => {
 });
 
 describe('calculatePayout', () => {
-  test('orbits 1 and 2 return full pot', () => {
-    expect(calculatePayout(1, 20)).toBe(20);
-    expect(calculatePayout(2, 20)).toBe(20);
+  test('orbits 1 and 2 return full pot regardless of limit', () => {
+    expect(calculatePayout(1, 20, 12)).toBe(20);
+    expect(calculatePayout(2, 20, 12)).toBe(20);
+    expect(calculatePayout(1, 20, 'none')).toBe(20);
+    expect(calculatePayout(2, 20, 'none')).toBe(20);
   });
 
-  test('orbit 3+ is capped at 12', () => {
+  test('orbit 3+ default limit (12) caps at 12', () => {
     expect(calculatePayout(3, 20)).toBe(12);
     expect(calculatePayout(4, 20)).toBe(12);
     expect(calculatePayout(10, 20)).toBe(12);
   });
 
-  test('orbit 3+ returns pot if under 12', () => {
-    expect(calculatePayout(3, 8)).toBe(8);
+  test('orbit 3+ returns pot if under limit', () => {
+    expect(calculatePayout(3, 8, 12)).toBe(8);
+    expect(calculatePayout(3, 8, 18)).toBe(8);
+  });
+
+  test('orbit 3+ limit 18 caps at 18', () => {
+    expect(calculatePayout(3, 30, 18)).toBe(18);
+    expect(calculatePayout(3, 15, 18)).toBe(15);
+  });
+
+  test('orbit 3+ limit 24 caps at 24', () => {
+    expect(calculatePayout(3, 50, 24)).toBe(24);
+    expect(calculatePayout(3, 20, 24)).toBe(20);
+  });
+
+  test('orbit 3+ with none returns full pot', () => {
+    expect(calculatePayout(3, 50, 'none')).toBe(50);
+    expect(calculatePayout(5, 100, 'none')).toBe(100);
   });
 });
 

@@ -67,11 +67,12 @@ function Btn({
 
 export default function Home() {
   const router   = useRouter();
-  const [name,           setName]           = useState('');
-  const [view,           setView]           = useState<View>('main');
-  const [knockTarget,    setKnockTarget]    = useState<5 | 6>(5);
-  const [roundsPerOrbit, setRoundsPerOrbit] = useState<5 | 6>(5);
-  const [roomCode,       setRoomCode]       = useState('');
+  const [name,            setName]            = useState('');
+  const [view,            setView]            = useState<View>('main');
+  const [knockTarget,     setKnockTarget]     = useState<5 | 6>(5);
+  const [roundsPerOrbit,  setRoundsPerOrbit]  = useState<5 | 6>(5);
+  const [challengeLimit,  setChallengeLimit]  = useState<'none' | 12 | 18 | 24>(12);
+  const [roomCode,        setRoomCode]        = useState('');
   const [error,       setError]       = useState('');
   const [loading,     setLoading]     = useState(false);
   const nameRef    = useRef(name);
@@ -105,12 +106,14 @@ export default function Home() {
 
     const onCreated = (d: {
       roomCode: string; knockTarget: number; roundsPerOrbit: number;
+      challengeLimit: 'none' | 12 | 18 | 24;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
       cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
         knockTarget: d.knockTarget, roundsPerOrbit: d.roundsPerOrbit,
+        challengeLimit: d.challengeLimit,
         players: d.players, hostId: d.hostId,
       }));
       router.push(`/room/${d.roomCode}`);
@@ -118,12 +121,14 @@ export default function Home() {
 
     const onJoined = (d: {
       roomCode: string; knockTarget: number; roundsPerOrbit: number;
+      challengeLimit: 'none' | 12 | 18 | 24;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
       cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
         knockTarget: d.knockTarget, roundsPerOrbit: d.roundsPerOrbit,
+        challengeLimit: d.challengeLimit,
         players: d.players, hostId: d.hostId,
       }));
       router.push(`/room/${d.roomCode}`);
@@ -159,7 +164,7 @@ export default function Home() {
       <div style={{ width: '100%', maxWidth: 340 }}>
 
         {/* Wordmark */}
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+        <div style={{ textAlign: 'center', marginBottom: view === 'create' ? 28 : 56 }}>
           <h1 className="mono" style={{
             fontSize: 64, fontWeight: 700, letterSpacing: '0.25em',
             color: 'var(--text-primary)', textTransform: 'uppercase',
@@ -201,68 +206,104 @@ export default function Home() {
         {/* ── CREATE view ── */}
         {view === 'create' && (
           <div>
-            <p style={{
-              fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: 'var(--text-muted)', marginBottom: 16,
-            }}>
-              Knock Target
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-              {([5, 6] as const).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setKnockTarget(n)}
-                  style={{
-                    flex: 1, padding: '28px 0',
-                    fontSize: 28, fontWeight: 700,
-                    border: `1px solid ${knockTarget === n ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
-                    borderRadius: 8,
-                    background: knockTarget === n ? 'var(--accent-glow)' : 'transparent',
-                    color: knockTarget === n ? 'var(--text-primary)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    transition: 'all 150ms ease-out',
-                    fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
+            {/* Shared option-row style */}
+            {(
+              [
+                {
+                  label: 'Knock Target',
+                  options: [5, 6] as const,
+                  active: knockTarget,
+                  set: setKnockTarget,
+                  fmt: (n: number) => String(n),
+                },
+                {
+                  label: 'Rounds Per Orbit',
+                  options: [5, 6] as const,
+                  active: roundsPerOrbit,
+                  set: setRoundsPerOrbit,
+                  fmt: (n: number) => String(n),
+                },
+              ] as const
+            ).map(({ label, options, active, set, fmt }) => (
+              <div key={label} style={{ marginBottom: 16 }}>
+                <p style={{
+                  fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
+                  color: 'var(--text-muted)', marginBottom: 8,
+                }}>
+                  {label}
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {options.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => (set as (v: typeof n) => void)(n)}
+                      style={{
+                        flex: 1, padding: '14px 0',
+                        fontSize: 18, fontWeight: 700,
+                        border: `1px solid ${active === n ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+                        borderRadius: 8,
+                        background: active === n ? 'var(--accent-glow)' : 'transparent',
+                        color: active === n ? 'var(--text-primary)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        transition: 'all 150ms ease-out',
+                        fontFamily: 'var(--font-jetbrains-mono), monospace',
+                      }}
+                    >
+                      {fmt(n)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Challenge Limit */}
+            <div style={{ marginBottom: 8 }}>
+              <p style={{
+                fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
+                color: 'var(--text-muted)', marginBottom: 8,
+              }}>
+                Challenge Limit
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['none', 12, 18, 24] as const).map((n) => (
+                  <button
+                    key={String(n)}
+                    onClick={() => setChallengeLimit(n)}
+                    style={{
+                      flex: 1, padding: '12px 0',
+                      fontSize: 12, fontWeight: 700,
+                      border: `1px solid ${challengeLimit === n ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+                      borderRadius: 8,
+                      background: challengeLimit === n ? 'var(--accent-glow)' : 'transparent',
+                      color: challengeLimit === n ? 'var(--text-primary)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      transition: 'all 150ms ease-out',
+                      fontFamily: 'var(--font-jetbrains-mono), monospace',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {n === 'none' ? 'NO LIMIT' : `$${n}`}
+                  </button>
+                ))}
+              </div>
+              <p style={{
+                fontSize: 10, color: 'var(--text-muted)', marginTop: 6,
+                letterSpacing: '0.04em',
+              }}>
+                Caps challenge amount from orbit 3 onwards
+              </p>
             </div>
-            <p style={{
-              fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: 'var(--text-muted)', marginBottom: 16,
-            }}>
-              Rounds Per Orbit
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-              {([5, 6] as const).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setRoundsPerOrbit(n)}
-                  style={{
-                    flex: 1, padding: '20px 0',
-                    fontSize: 20, fontWeight: 700,
-                    border: `1px solid ${roundsPerOrbit === n ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
-                    borderRadius: 8,
-                    background: roundsPerOrbit === n ? 'var(--accent-glow)' : 'transparent',
-                    color: roundsPerOrbit === n ? 'var(--text-primary)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    transition: 'all 150ms ease-out',
-                    fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <Btn label="Back" onClick={() => { setView('main'); setError(''); }} />
               <Btn
                 label={loading ? 'Creating\u2026' : 'Create'} primary
                 disabled={loading}
                 onClick={() => {
                   setError(''); setLoading(true); startTimeout();
-                  getSocket().emit('create_room', { playerName: name.trim(), knockTarget, roundsPerOrbit });
+                  getSocket().emit('create_room', {
+                    playerName: name.trim(), knockTarget, roundsPerOrbit, challengeLimit,
+                  });
                 }}
               />
             </div>

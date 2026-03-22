@@ -208,6 +208,7 @@ function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
 interface LobbyPlayer { id: string; name: string }
 interface StoredSession {
   playerName: string; roomCode: string; knockTarget: number; roundsPerOrbit: number;
+  challengeLimit: 'none' | 12 | 18 | 24;
   players: LobbyPlayer[]; hostId: string;
 }
 
@@ -327,25 +328,29 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
           </button>
         </div>
 
-        {/* Knock target + rounds per orbit pill */}
+        {/* Room settings pill */}
         <div style={{
           border: '1px solid var(--border-subtle)',
-          padding: '12px 20px', textAlign: 'center',
-          marginBottom: 28, borderRadius: 4,
-          display: 'flex', justifyContent: 'center', gap: 20,
+          padding: '10px 16px', marginBottom: 28, borderRadius: 4,
+          display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Playing to{' '}
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
               {session.knockTarget}
             </span>
-            {' '}knock{session.knockTarget !== 1 ? 's' : ''}
+            {' '}knocks
           </span>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
               {session.roundsPerOrbit ?? 5}
             </span>
             {' '}rounds/orbit
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {(session.challengeLimit == null || session.challengeLimit === 'none')
+              ? <>Challenge limit: <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>None</span></>
+              : <>Challenge limit: <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${session.challengeLimit}</span></>
+            }
           </span>
         </div>
 
