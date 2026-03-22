@@ -229,12 +229,16 @@ export function GameProvider({
       orbit: number; round: number; potTotal: number; payout?: number;
       phase: string; knockTarget: number; players: PublicPlayer[]; myCards: Card[];
       waitingFor?: { playerName: string; phase: string } | null;
+      myId?: string;
     }) => patch({
       gamePhase: 'PLAYING', orbit: d.orbit, round: d.round,
       potTotal: d.potTotal, payout: d.payout ?? 0,
       knockTarget: d.knockTarget,
       players: d.players, myCards: d.myCards, serverPhase: d.phase,
       ...(d.waitingFor !== undefined ? { waitingFor: d.waitingFor } : {}),
+      // myId from server is the stable game-player ID, which survives socket reconnects.
+      // Without this, after a page refresh the new socket.id wouldn't match any player.
+      ...(d.myId !== undefined ? { myId: d.myId } : {}),
     });
 
     socket.on('round_started',   onRoundStarted);

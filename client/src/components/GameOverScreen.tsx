@@ -261,7 +261,10 @@ export default function GameOverScreen({ data, roomCode, isHost }: Props) {
 
         {/* Back home */}
         <button
-          onClick={() => router.push('/')}
+          onClick={() => {
+            getSocket().emit('leave_room', { roomCode });
+            router.push('/');
+          }}
           style={{
             width: '100%',
             marginTop: 8,

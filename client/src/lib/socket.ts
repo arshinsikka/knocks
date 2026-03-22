@@ -19,5 +19,14 @@ export function getSocket(): Socket {
       randomizationFactor: 0.5,
     });
   }
+  console.log(`Socket: ${socket.connected ? 'reusing existing' : 'creating new'}`);
   return socket;
+}
+
+/** Fully tears down the socket — call when intentionally leaving all rooms. */
+export function disconnectSocket(): void {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 }

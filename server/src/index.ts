@@ -398,7 +398,7 @@ io.on('connection', (socket: Socket) => {
         hostId: room.hostId,
       });
 
-      console.log(`[room] JOINED ${room.code} by "${playerName}" (players: ${room.players.length})`);
+      console.log(`ROOM ${room.code}: ${playerName} joined. Players: ${room.players.map((p) => p.name).join(', ')}`);
     },
   );
 
@@ -588,6 +588,8 @@ io.on('connection', (socket: Socket) => {
       players: publicPlayers(game),
       myCards: player.cards,
       waitingFor: waitingInfo ?? null,
+      // Stable game-player ID — survives socket reconnects (socket.id changes on refresh)
+      myId: player.id,
     });
 
     // Re-emit turn signals so the rejoining player knows where we are
@@ -623,6 +625,7 @@ io.on('connection', (socket: Socket) => {
       players: publicPlayers(game),
       myCards: me.cards,
       waitingFor: waitingInfo ?? null,
+      myId: me.id,
     });
 
     // Re-emit turn signals
@@ -653,6 +656,52 @@ io.on('connection', (socket: Socket) => {
     });
 
     console.log(`[room] REMATCH started in ${roomCode}`);
+  });
+
+  // ── LOBBY: leave_room ────────────────────────────────────────────────────────
+  // Explicit leave (Back to Home, navigating away). In-game: keep room state so
+  // the player can rejoin; just remove the socket from the broadcast channel.
+  // Lobby: remove the player immediately (intentional departure, no grace period).
+  socket.on('leave_room', ({ roomCode }: { roomCode: string }) => {
+    const upper = roomCode?.toUpperCase();
+
+    if (activeGames.has(upper)) {
+      // Mid-game — player may rejoin; don't delete their game state
+      socket.leave(upper);
+      console.log(`[room] ${upper} leave_room mid-game (socket ${socket.id})`);
+      return;
+    }
+
+    const room = rooms.get(upper);
+    if (!room) return;
+
+    const idx = room.players.findIndex((p) => p.id === socket.id);
+    if (idx === -1) return;
+
+    const playerName = room.players[idx].name;
+
+    // Cancel any pending lobby-disconnect grace timer for this player
+    const timerKey = `${upper}:${playerName}`;
+    const pending  = lobbyDisconnectTimers.get(timerKey);
+    if (pending) { clearTimeout(pending); lobbyDisconnectTimers.delete(timerKey); }
+
+    const [removed] = room.players.splice(idx, 1);
+    socket.leave(upper);
+
+    if (room.hostId === removed.id && room.players.length > 0) {
+      room.hostId = room.players[0].id;
+    }
+
+    if (room.players.length > 0) {
+      io.to(upper).emit('player_left', {
+        players: room.players,
+        removedPlayer: removed,
+        hostId: room.hostId,
+      });
+    }
+
+    room.lastActivity = Date.now();
+    console.log(`[room] ${upper} player "${playerName}" left lobby (players: ${room.players.length})`);
   });
 
   // ── disconnect ───────────────────────────────────────────────────────────────

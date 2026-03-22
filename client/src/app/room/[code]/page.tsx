@@ -482,10 +482,23 @@ export default function RoomPage() {
     };
     socket.on('rematch_started', onRematchStarted);
 
+    // Re-join the server room on every reconnect (handles network blips in the
+    // lobby where ReconnectBanner isn't mounted, and supplements it mid-game).
+    let wasConnected = socket.connected;
+    const onReconnect = () => {
+      if (wasConnected) {
+        // Genuine reconnect — not the initial connection event
+        socket.emit('rejoin_game', { roomCode: code, playerName: parsed.playerName });
+      }
+      wasConnected = true;
+    };
+    socket.on('connect', onReconnect);
+
     return () => {
       socket.off('game_started', onGameStarted);
       socket.off('state_snapshot', onSnapshot);
       socket.off('rematch_started', onRematchStarted);
+      socket.off('connect', onReconnect);
     };
   }, [code, router]);
 

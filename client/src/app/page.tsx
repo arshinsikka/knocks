@@ -90,6 +90,16 @@ export default function Home() {
   }, [cancelTimeout]);
 
   useEffect(() => {
+    // Clean up any previous game session so stale room state doesn't bleed through.
+    const prevSession = sessionStorage.getItem('knocks_session');
+    if (prevSession) {
+      try {
+        const { roomCode } = JSON.parse(prevSession) as { roomCode?: string };
+        if (roomCode) getSocket().emit('leave_room', { roomCode });
+      } catch { /* malformed session — ignore */ }
+      sessionStorage.removeItem('knocks_session');
+    }
+
     const socket = getSocket();
 
     const onCreated = (d: {
