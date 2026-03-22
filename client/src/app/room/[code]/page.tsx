@@ -65,7 +65,7 @@ function PlayerRing() {
 function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
   const {
     orbit, round, potTotal, payout, knockTarget,
-    players, myCards, myId,
+    players, myCards, selectedCards, myId,
     isMyTurn, turnPhase, serverPhase, waitingFor,
     showdownData, latestKnock, gameOver, playerChoices,
     emitIn, emitOut, emitJoin, emitPass,
@@ -153,7 +153,7 @@ function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
       <PlayerRing />
 
       {/* Zone 3 — Hand Tray */}
-      <HandTray cards={myCards} />
+      <HandTray cards={myCards} selectedCards={selectedCards} round={round} />
 
       {/* Zone 4 — Action Bar */}
       <ActionBar

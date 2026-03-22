@@ -147,7 +147,11 @@ function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   // Private card delivery
   for (const [playerId, cards] of dealt) {
     const pl = s.players.find((p) => p.id === playerId)!;
-    io.to(pl.socketId).emit('cards_dealt', { round: s.round, cards });
+    io.to(pl.socketId).emit('cards_dealt', {
+      round: s.round,
+      cards,
+      selectedCards: pl.bestHand?.cards ?? cards,
+    });
   }
 
   // First actor
@@ -594,6 +598,7 @@ io.on('connection', (socket: Socket) => {
       roundsPerOrbit: s.roundsPerOrbit,
       players: publicPlayers(game),
       myCards: player.cards,
+      selectedCards: player.bestHand?.cards ?? player.cards,
       waitingFor: waitingInfo ?? null,
       // Stable game-player ID — survives socket reconnects (socket.id changes on refresh)
       myId: player.id,
@@ -632,6 +637,7 @@ io.on('connection', (socket: Socket) => {
       roundsPerOrbit: s.roundsPerOrbit,
       players: publicPlayers(game),
       myCards: me.cards,
+      selectedCards: me.bestHand?.cards ?? me.cards,
       waitingFor: waitingInfo ?? null,
       myId: me.id,
     });

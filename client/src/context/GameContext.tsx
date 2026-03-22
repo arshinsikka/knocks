@@ -61,8 +61,9 @@ export interface GameState {
   knockTarget:    number;
   roundsPerOrbit: number;
   players:        PublicPlayer[];
-  myCards:      Card[];
-  myId:         string;
+  myCards:        Card[];
+  selectedCards:  Card[];
+  myId:           string;
   isMyTurn:     boolean;
   turnPhase:    'in_out' | 'challenge_join' | null;
   waitingFor:   { playerName: string; phase: string } | null;
@@ -92,7 +93,8 @@ const DEFAULT: GameState = {
   knockTarget:    5,
   roundsPerOrbit: 5,
   players:        [],
-  myCards:       [],
+  myCards:        [],
+  selectedCards:  [],
   myId:          '',
   isMyTurn:      false,
   turnPhase:     null,
@@ -142,7 +144,7 @@ export function GameProvider({
         knockTarget: d.knockTarget,
         ...(d.roundsPerOrbit !== undefined ? { roundsPerOrbit: d.roundsPerOrbit } : {}),
         potTotal: d.potTotal, payout: d.payout,
-        players: d.players, myCards: [], isMyTurn: false, turnPhase: null,
+        players: d.players, myCards: [], selectedCards: [], isMyTurn: false, turnPhase: null,
         waitingFor: null, latestKnock: null,
         // showdownData intentionally NOT cleared here — the overlay manages
         // its own 6-second lifecycle and dismisses independently via dismissShowdown.
@@ -151,8 +153,8 @@ export function GameProvider({
       addLog(`Orbit ${d.orbit} · Round ${d.round} — ${d.startingPlayerName} goes first`);
     };
 
-    const onCardsDealt = (d: { round: number; cards: Card[] }) =>
-      patch({ myCards: d.cards });
+    const onCardsDealt = (d: { round: number; cards: Card[]; selectedCards?: Card[] }) =>
+      patch({ myCards: d.cards, selectedCards: d.selectedCards ?? d.cards });
 
     const onYourTurn = (d: { phase: 'in_out' | 'challenge_join' }) => {
       console.log('[GameContext] your_turn received:', d);
@@ -233,7 +235,7 @@ export function GameProvider({
     const onStateSnapshot = (d: {
       orbit: number; round: number; potTotal: number; payout?: number;
       phase: string; knockTarget: number; roundsPerOrbit?: number;
-      players: PublicPlayer[]; myCards: Card[];
+      players: PublicPlayer[]; myCards: Card[]; selectedCards?: Card[];
       waitingFor?: { playerName: string; phase: string } | null;
       myId?: string;
     }) => patch({
@@ -241,7 +243,9 @@ export function GameProvider({
       potTotal: d.potTotal, payout: d.payout ?? 0,
       knockTarget: d.knockTarget,
       ...(d.roundsPerOrbit !== undefined ? { roundsPerOrbit: d.roundsPerOrbit } : {}),
-      players: d.players, myCards: d.myCards, serverPhase: d.phase,
+      players: d.players, myCards: d.myCards,
+      selectedCards: d.selectedCards ?? d.myCards,
+      serverPhase: d.phase,
       ...(d.waitingFor !== undefined ? { waitingFor: d.waitingFor } : {}),
       // myId from server is the stable game-player ID, which survives socket reconnects.
       // Without this, after a page refresh the new socket.id wouldn't match any player.
