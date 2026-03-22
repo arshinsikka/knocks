@@ -510,7 +510,34 @@ export default function RoomPage() {
     const onSnapshot = () => setGameStarted(true);
     socket.on('state_snapshot', onSnapshot);
 
-    const onRematchStarted = (d: { players: LobbyPlayer[]; hostId: string; knockTarget: number }) => {
+    // Keep session.hostId and session.players in sync with the server.
+    // This is critical: when the host reconnects in the lobby their socket.id
+    // changes, the server updates room.hostId and broadcasts player_joined with
+    // the new hostId. Without this listener, session.hostId would stay stale and
+    // isHost would compute false for the host once the game starts.
+    const onPlayerJoined = (d: { players: LobbyPlayer[]; hostId: string }) => {
+      setSession((prev) => prev ? { ...prev, players: d.players, hostId: d.hostId } : null);
+      // Keep sessionStorage consistent so a full-page refresh still works
+      const s = sessionStorage.getItem('knocks_session');
+      if (s) {
+        sessionStorage.setItem('knocks_session', JSON.stringify({
+          ...JSON.parse(s), players: d.players, hostId: d.hostId,
+        }));
+      }
+    };
+    const onPlayerLeft = (d: { players: LobbyPlayer[]; hostId: string }) => {
+      setSession((prev) => prev ? { ...prev, players: d.players, hostId: d.hostId } : null);
+      const s = sessionStorage.getItem('knocks_session');
+      if (s) {
+        sessionStorage.setItem('knocks_session', JSON.stringify({
+          ...JSON.parse(s), players: d.players, hostId: d.hostId,
+        }));
+      }
+    };
+    socket.on('player_joined', onPlayerJoined);
+    socket.on('player_left',   onPlayerLeft);
+
+    const onRematchStarted = (d: { players: LobbyPlayer[]; hostId: string; knockTarget: number; roundsPerOrbit?: number; challengeLimit?: 'none' | 12 | 18 | 24 }) => {
       setSession((prev) => prev ? { ...prev, players: d.players, hostId: d.hostId } : null);
       const s = sessionStorage.getItem('knocks_session');
       if (s) {
@@ -551,6 +578,8 @@ export default function RoomPage() {
     return () => {
       socket.off('game_started', onGameStarted);
       socket.off('state_snapshot', onSnapshot);
+      socket.off('player_joined', onPlayerJoined);
+      socket.off('player_left',   onPlayerLeft);
       socket.off('rematch_started', onRematchStarted);
       socket.off('game_over', onGameOver);
       socket.off('ledger_data', onLedgerData);

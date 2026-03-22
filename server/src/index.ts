@@ -763,10 +763,13 @@ io.on('connection', (socket: Socket) => {
   socket.on('request_rematch', ({ roomCode }: { roomCode: string }) => {
     const room = rooms.get(roomCode);
     if (!room) { socket.emit('error', { message: 'Room not found' }); return; }
-    if (room.hostId !== socket.id) { socket.emit('error', { message: 'Only the host can start a rematch' }); return; }
+    // Any player in the room can trigger a rematch (not host-exclusive)
+    const isInRoom = room.players.some((p) => p.id === socket.id);
+    if (!isInRoom) { socket.emit('error', { message: 'Not in this room' }); return; }
+    // Guard: don't allow rematch while a game is actively running
+    if (activeGames.has(roomCode)) { socket.emit('error', { message: 'Game still in progress' }); return; }
 
     clearTurnTimer(roomCode);
-    activeGames.delete(roomCode);
     room.gameStarted = false;
     room.lastActivity = Date.now();
 
@@ -774,6 +777,7 @@ io.on('connection', (socket: Socket) => {
       players: room.players,
       hostId: room.hostId,
       knockTarget: room.knockTarget,
+      roundsPerOrbit: room.roundsPerOrbit,
       challengeLimit: room.challengeLimit,
     });
 

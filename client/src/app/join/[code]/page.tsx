@@ -25,13 +25,17 @@ export default function JoinPage() {
     const socket = getSocket();
 
     const onJoined = (d: {
-      roomCode: string; knockTarget: number;
+      roomCode: string; knockTarget: number; roundsPerOrbit?: number;
+      challengeLimit?: 'none' | 12 | 18 | 24;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
       cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
-        knockTarget: d.knockTarget, players: d.players, hostId: d.hostId,
+        knockTarget: d.knockTarget,
+        roundsPerOrbit: d.roundsPerOrbit ?? 5,
+        challengeLimit: d.challengeLimit ?? 12,
+        players: d.players, hostId: d.hostId,
       }));
       router.push(`/room/${d.roomCode}`);
     };
