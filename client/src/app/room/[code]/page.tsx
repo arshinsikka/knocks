@@ -207,7 +207,7 @@ function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
 
 interface LobbyPlayer { id: string; name: string }
 interface StoredSession {
-  playerName: string; roomCode: string; knockTarget: number;
+  playerName: string; roomCode: string; knockTarget: number; roundsPerOrbit: number;
   players: LobbyPlayer[]; hostId: string;
 }
 
@@ -327,11 +327,12 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
           </button>
         </div>
 
-        {/* Knock target pill */}
+        {/* Knock target + rounds per orbit pill */}
         <div style={{
           border: '1px solid var(--border-subtle)',
           padding: '12px 20px', textAlign: 'center',
           marginBottom: 28, borderRadius: 4,
+          display: 'flex', justifyContent: 'center', gap: 20,
         }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Playing to{' '}
@@ -339,6 +340,12 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
               {session.knockTarget}
             </span>
             {' '}knock{session.knockTarget !== 1 ? 's' : ''}
+          </span>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+              {session.roundsPerOrbit ?? 5}
+            </span>
+            {' '}rounds/orbit
           </span>
         </div>
 
@@ -509,7 +516,7 @@ export default function RoomPage() {
   }
 
   return (
-    <GameProvider knockTarget={session.knockTarget} roomCode={code}>
+    <GameProvider knockTarget={session.knockTarget} roundsPerOrbit={session.roundsPerOrbit ?? 5} roomCode={code}>
       <ReconnectBanner roomCode={code} playerName={session.playerName} />
       <GameBoard roomCode={code} hostId={session.hostId} />
     </GameProvider>

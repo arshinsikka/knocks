@@ -12,7 +12,7 @@ interface Props {
 export default function HandTray({ cards }: Props) {
   const count = cards.length;
   const overlapping = count >= 4;
-  const overlapMargin = count === 5 ? -10 : -8;
+  const overlapMargin = count === 6 ? -12 : count === 5 ? -10 : -8;
 
   // Play deal sound for each newly arrived card with slight stagger + pitch variation
   const prevCountRef = useRef(0);

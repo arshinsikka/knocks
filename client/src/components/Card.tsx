@@ -20,6 +20,7 @@ const SIZES: Record<number, CardSize> = {
   3: { w: 60, h: 88,  fontSize: 15, suitSize: 24 },
   4: { w: 55, h: 82,  fontSize: 14, suitSize: 22 },
   5: { w: 50, h: 75,  fontSize: 13, suitSize: 20 },
+  6: { w: 45, h: 68,  fontSize: 12, suitSize: 18 },
 };
 
 interface Props {
@@ -32,7 +33,7 @@ interface Props {
 export default function Card({ card, totalCards = 1, index = 0, mini = false }: Props) {
   const sz = mini
     ? { w: 40, h: 58, fontSize: 11, suitSize: 14 }
-    : (SIZES[Math.min(totalCards, 5) as keyof typeof SIZES] ?? SIZES[5]);
+    : (SIZES[Math.min(totalCards, 6) as keyof typeof SIZES] ?? SIZES[6]);
 
   const delayMs = index * 100;
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';

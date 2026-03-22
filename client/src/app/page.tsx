@@ -67,10 +67,11 @@ function Btn({
 
 export default function Home() {
   const router   = useRouter();
-  const [name,        setName]        = useState('');
-  const [view,        setView]        = useState<View>('main');
-  const [knockTarget, setKnockTarget] = useState<5 | 6>(5);
-  const [roomCode,    setRoomCode]    = useState('');
+  const [name,           setName]           = useState('');
+  const [view,           setView]           = useState<View>('main');
+  const [knockTarget,    setKnockTarget]    = useState<5 | 6>(5);
+  const [roundsPerOrbit, setRoundsPerOrbit] = useState<5 | 6>(5);
+  const [roomCode,       setRoomCode]       = useState('');
   const [error,       setError]       = useState('');
   const [loading,     setLoading]     = useState(false);
   const nameRef    = useRef(name);
@@ -103,25 +104,27 @@ export default function Home() {
     const socket = getSocket();
 
     const onCreated = (d: {
-      roomCode: string; knockTarget: number;
+      roomCode: string; knockTarget: number; roundsPerOrbit: number;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
       cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
-        knockTarget: d.knockTarget, players: d.players, hostId: d.hostId,
+        knockTarget: d.knockTarget, roundsPerOrbit: d.roundsPerOrbit,
+        players: d.players, hostId: d.hostId,
       }));
       router.push(`/room/${d.roomCode}`);
     };
 
     const onJoined = (d: {
-      roomCode: string; knockTarget: number;
+      roomCode: string; knockTarget: number; roundsPerOrbit: number;
       players: { id: string; name: string }[]; hostId: string;
     }) => {
       cancelTimeout();
       sessionStorage.setItem('knocks_session', JSON.stringify({
         playerName: nameRef.current.trim(), roomCode: d.roomCode,
-        knockTarget: d.knockTarget, players: d.players, hostId: d.hostId,
+        knockTarget: d.knockTarget, roundsPerOrbit: d.roundsPerOrbit,
+        players: d.players, hostId: d.hostId,
       }));
       router.push(`/room/${d.roomCode}`);
     };
@@ -225,6 +228,33 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            <p style={{
+              fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
+              color: 'var(--text-muted)', marginBottom: 16,
+            }}>
+              Rounds Per Orbit
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+              {([5, 6] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setRoundsPerOrbit(n)}
+                  style={{
+                    flex: 1, padding: '20px 0',
+                    fontSize: 20, fontWeight: 700,
+                    border: `1px solid ${roundsPerOrbit === n ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+                    borderRadius: 8,
+                    background: roundsPerOrbit === n ? 'var(--accent-glow)' : 'transparent',
+                    color: roundsPerOrbit === n ? 'var(--text-primary)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 150ms ease-out',
+                    fontFamily: 'var(--font-jetbrains-mono), monospace',
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <Btn label="Back" onClick={() => { setView('main'); setError(''); }} />
               <Btn
@@ -232,7 +262,7 @@ export default function Home() {
                 disabled={loading}
                 onClick={() => {
                   setError(''); setLoading(true); startTimeout();
-                  getSocket().emit('create_room', { playerName: name.trim(), knockTarget });
+                  getSocket().emit('create_room', { playerName: name.trim(), knockTarget, roundsPerOrbit });
                 }}
               />
             </div>

@@ -117,6 +117,11 @@ export default function StatusBar({ roomCode, orbit, round, potTotal, serverPhas
       {/* Row 2: orbit/round */}
       <div style={{ textAlign: 'center', fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
         ORBIT {orbit} &middot; ROUND {round}
+        {round === 6 && (
+          <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--text-secondary)' }}>
+            POKER
+          </span>
+        )}
       </div>
 
       {/* Row 3: pot */}

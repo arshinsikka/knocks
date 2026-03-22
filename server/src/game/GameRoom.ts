@@ -1,4 +1,4 @@
-import { Card, GamePhase, GamePlayer, ClassifiedHand } from './types';
+import { Card, GamePhase, GamePlayer, BestHand } from './types';
 import { buildDeck, shuffle } from './Deck';
 import { getBestHand } from './Rounds';
 import { resolveShowdown, ShowdownResult } from './Showdown';
@@ -7,7 +7,7 @@ import { addOrbitContribution, calculatePayout, settleShowdown } from './Pot';
 export interface RoundSummary {
   round: number;
   orbit: number;
-  participants: Array<{ playerId: string; hand: ClassifiedHand }>;
+  participants: Array<{ playerId: string; hand: BestHand }>;
   winner: string | null;     // playerId, null = no participants or tie
   payout: number;
   knockAwarded: boolean;
@@ -20,9 +20,10 @@ export interface RoundSummary {
 export interface GameRoomState {
   roomCode: string;
   knockTarget: 5 | 6;
+  roundsPerOrbit: 5 | 6;
   phase: GamePhase;
   orbit: number;
-  round: number;                 // 1-5
+  round: number;                 // 1-N (N = roundsPerOrbit)
   orbitStarterIndex: number;
   currentTurnIndex: number;
   players: GamePlayer[];
@@ -40,6 +41,7 @@ export class GameRoom {
     roomCode: string,
     playerInfos: Array<{ id: string; name: string; socketId: string }>,
     knockTarget: 5 | 6,
+    roundsPerOrbit: 5 | 6 = 5,
   ) {
     const players: GamePlayer[] = playerInfos.map((p) => ({
       ...p,
@@ -59,6 +61,7 @@ export class GameRoom {
     this.state = {
       roomCode,
       knockTarget,
+      roundsPerOrbit,
       phase: 'LOBBY',
       orbit: 1,
       round: 1,
@@ -294,7 +297,7 @@ export class GameRoom {
 
     s.phase = 'ROUND_END';
 
-    if (s.round < 5) {
+    if (s.round < s.roundsPerOrbit) {
       s.round += 1;
     } else {
       s.orbit += 1;

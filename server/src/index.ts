@@ -4,7 +4,7 @@ import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import { GameRoom } from './game/GameRoom';
 import { calculatePayout } from './game/Pot';
-import { Card, ClassifiedHand, GamePlayer } from './game/types';
+import { Card, BestHand, GamePlayer } from './game/types';
 
 // ── Lobby types ───────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ interface RoomState {
   hostId: string;
   players: LobbyPlayer[];
   knockTarget: 5 | 6;
+  roundsPerOrbit: 5 | 6;
   gameStarted: boolean;
   lastActivity: number; // Date.now() ms
 }
@@ -181,7 +182,7 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
 
     // showdown_reveal → participants only
     const allHandsMap = new Map(
-      participants.map((p) => [p.id, p.bestHand as ClassifiedHand]),
+      participants.map((p) => [p.id, p.bestHand as BestHand]),
     );
 
     for (const p of participants) {
@@ -345,7 +346,7 @@ io.on('connection', (socket: Socket) => {
   // ── LOBBY: create_room ──────────────────────────────────────────────────────
   socket.on(
     'create_room',
-    ({ playerName, knockTarget }: { playerName: string; knockTarget: 5 | 6 }) => {
+    ({ playerName, knockTarget, roundsPerOrbit = 5 }: { playerName: string; knockTarget: 5 | 6; roundsPerOrbit?: 5 | 6 }) => {
       if (!playerName?.trim()) { socket.emit('error', { message: 'Name required' }); return; }
 
       const code = uniqueCode();
@@ -354,6 +355,7 @@ io.on('connection', (socket: Socket) => {
         hostId: socket.id,
         players: [{ id: socket.id, name: playerName.trim() }],
         knockTarget,
+        roundsPerOrbit,
         gameStarted: false,
         lastActivity: Date.now(),
       });
@@ -362,6 +364,7 @@ io.on('connection', (socket: Socket) => {
       socket.emit('room_created', {
         roomCode: code,
         knockTarget,
+        roundsPerOrbit,
         players: rooms.get(code)!.players,
         hostId: socket.id,
       });
@@ -388,6 +391,7 @@ io.on('connection', (socket: Socket) => {
       socket.emit('room_joined', {
         roomCode: room.code,
         knockTarget: room.knockTarget,
+        roundsPerOrbit: room.roundsPerOrbit,
         players: room.players,
         hostId: room.hostId,
       });
@@ -416,12 +420,14 @@ io.on('connection', (socket: Socket) => {
       roomCode,
       room.players.map((p) => ({ id: p.id, name: p.name, socketId: p.id })),
       room.knockTarget,
+      room.roundsPerOrbit,
     );
     activeGames.set(roomCode, game);
 
     io.to(roomCode).emit('game_started', {
       players: room.players,
       knockTarget: room.knockTarget,
+      roundsPerOrbit: room.roundsPerOrbit,
     });
 
     console.log(`[room] GAME STARTED in ${roomCode} (players: ${room.players.length})`);
@@ -585,6 +591,7 @@ io.on('connection', (socket: Socket) => {
       payout,
       phase: s.phase,
       knockTarget: s.knockTarget,
+      roundsPerOrbit: s.roundsPerOrbit,
       players: publicPlayers(game),
       myCards: player.cards,
       waitingFor: waitingInfo ?? null,
@@ -622,6 +629,7 @@ io.on('connection', (socket: Socket) => {
       payout,
       phase: s.phase,
       knockTarget: s.knockTarget,
+      roundsPerOrbit: s.roundsPerOrbit,
       players: publicPlayers(game),
       myCards: me.cards,
       waitingFor: waitingInfo ?? null,

@@ -1,6 +1,7 @@
-import { Card, ClassifiedHand, SUIT_ORDER } from './types';
+import { Card, BestHand, ClassifiedHand, SUIT_ORDER } from './types';
 import { buildDeck } from './Deck';
 import { classifyHand, compareHands } from './TeenPatti';
+import { bestPokerSubset } from './Poker';
 
 function combinations3(arr: Card[]): Card[][] {
   const result: Card[][] = [];
@@ -60,13 +61,15 @@ export function findJoker(cards: [Card, Card, Card]): Card | null {
 }
 
 /**
- * Returns ClassifiedHand (or a round-1 pseudo-hand with a single card).
+ * Returns a BestHand for the given round:
+ *   rounds 1-5 → ClassifiedHand (Teen Patti)
+ *   round 6    → PokerHand (best 5 from 6, evaluated with poker rankings)
  */
 export function getBestHand(
   playerCards: Card[],
   round: number,
   allDealtCards: Card[],
-): ClassifiedHand {
+): BestHand {
   // ── Round 1: single card ──────────────────────────────────────────────────
   if (round === 1) {
     const c = playerCards[0];
@@ -140,6 +143,11 @@ export function getBestHand(
     const subsets = combinations3(playerCards);
     const hands = subsets.map((s) => classifyHand(s));
     return bestOf(hands, 'normal', 5);
+  }
+
+  // ── Round 6: 6 cards, best POKER 5-card subset ───────────────────────────
+  if (round === 6) {
+    return bestPokerSubset(playerCards);
   }
 
   throw new Error(`Unknown round: ${round}`);

@@ -1,13 +1,14 @@
-import { Card, ClassifiedHand, GamePlayer } from './types';
+import { Card, BestHand, ClassifiedHand, GamePlayer, PokerHand } from './types';
 import { compareHands } from './TeenPatti';
 import { getBestHand, compareCards } from './Rounds';
+import { comparePokerHands } from './Poker';
 
 export interface ShowdownResult {
   winner: GamePlayer | null;       // null when tie
   payers: GamePlayer[];            // worst-hand player(s) who pay the winner
   safePlayers: GamePlayer[];       // middle players — pay nothing
-  winningHand: ClassifiedHand | null;
-  allHands: Array<{ player: GamePlayer; hand: ClassifiedHand }>;
+  winningHand: BestHand | null;
+  allHands: Array<{ player: GamePlayer; hand: BestHand }>;
   tie: boolean;
 }
 
@@ -29,11 +30,12 @@ export function resolveShowdown(
 
   // Unified comparator: returns 1 if a is better than b, -1 if worse, 0 if equal
   const cmp = (
-    a: { player: GamePlayer; hand: ClassifiedHand },
-    b: { player: GamePlayer; hand: ClassifiedHand },
+    a: { player: GamePlayer; hand: BestHand },
+    b: { player: GamePlayer; hand: BestHand },
   ): 1 | -1 | 0 => {
     if (round === 1) return compareCards(a.hand.cards[0], b.hand.cards[0]);
-    return compareHands(a.hand, b.hand, mode, round);
+    if (round === 6) return comparePokerHands(a.hand as PokerHand, b.hand as PokerHand);
+    return compareHands(a.hand as ClassifiedHand, b.hand as ClassifiedHand, mode, round);
   };
 
   // Find the best hand

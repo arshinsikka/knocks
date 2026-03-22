@@ -1,13 +1,13 @@
 import { GameRoom } from '../GameRoom';
 import { buildDeck, shuffle } from '../Deck';
 
-function makeRoom(numPlayers: number, knockTarget: 5 | 6 = 5) {
+function makeRoom(numPlayers: number, knockTarget: 5 | 6 = 5, roundsPerOrbit: 5 | 6 = 5) {
   const players = Array.from({ length: numPlayers }, (_, i) => ({
     id: `p${i + 1}`,
     name: `Player${i + 1}`,
     socketId: `s${i + 1}`,
   }));
-  return { game: new GameRoom('TESTXX', players, knockTarget), players };
+  return { game: new GameRoom('TESTXX', players, knockTarget, roundsPerOrbit), players };
 }
 
 // Helper: play through an IN_OUT phase where all players make a given choice
@@ -326,5 +326,102 @@ describe('Scenario 8: orbit starter rotation', () => {
 
     game.startRound();
     expect(game.getState().orbitStarterIndex).toBe((s1 + 1) % 2);
+  });
+});
+
+// ── Round 6 / roundsPerOrbit integration tests ───────────────────────────────
+
+describe('roundsPerOrbit = 6', () => {
+  function playThroughRound(
+    game: GameRoom,
+    players: { id: string }[],
+    choice: 'in' | 'out' = 'out',
+  ) {
+    game.startRound();
+    allChooseInOut(game, players, choice);
+    game.resolveRound();
+    game.advanceRound();
+  }
+
+  test('advanceRound stays within orbit through round 6', () => {
+    const { game, players } = makeRoom(2, 5, 6);
+    game.startRound();
+    const startOrbit = game.getState().orbit;
+
+    for (let r = 1; r <= 5; r++) {
+      allChooseInOut(game, players, 'out');
+      game.resolveRound();
+      game.advanceRound();
+      if (r < 6) {
+        expect(game.getState().orbit).toBe(startOrbit); // still same orbit
+      }
+    }
+  });
+
+  test('orbit increments only after round 6 (not round 5)', () => {
+    const { game, players } = makeRoom(2, 5, 6);
+    const orbit1 = game.getState().orbit;
+
+    // Play rounds 1-6
+    for (let r = 0; r < 6; r++) {
+      playThroughRound(game, players, 'out');
+    }
+
+    expect(game.getState().orbit).toBe(orbit1 + 1);
+    expect(game.getState().round).toBe(1);
+  });
+
+  test('round 6 deals 6 cards per player', () => {
+    const { game, players } = makeRoom(2, 5, 6);
+
+    // Play rounds 1-5
+    for (let r = 0; r < 5; r++) {
+      playThroughRound(game, players, 'out');
+    }
+
+    // Round 6
+    game.startRound();
+    const s = game.getState();
+    expect(s.round).toBe(6);
+    for (const p of s.players) {
+      expect(p.cards.length).toBe(6);
+    }
+  });
+
+  test('round 6 bestHand has type from poker hand types', () => {
+    const { game, players } = makeRoom(2, 5, 6);
+    const pokerTypes = new Set([
+      'royal_flush','straight_flush','four_of_a_kind','full_house',
+      'flush','straight','three_of_a_kind','two_pair','one_pair','high_card',
+    ]);
+
+    for (let r = 0; r < 5; r++) playThroughRound(game, players, 'out');
+    game.startRound();
+
+    const s = game.getState();
+    for (const p of s.players) {
+      expect(pokerTypes.has(p.bestHand!.type)).toBe(true);
+    }
+  });
+
+  test('roundsPerOrbit=5 still ends orbit at round 5', () => {
+    const { game, players } = makeRoom(2, 5, 5);
+    const orbit1 = game.getState().orbit;
+
+    for (let r = 0; r < 5; r++) playThroughRound(game, players, 'out');
+
+    expect(game.getState().orbit).toBe(orbit1 + 1);
+    expect(game.getState().round).toBe(1);
+  });
+
+  test('starter rotation still happens after 6-round orbit', () => {
+    const { game, players } = makeRoom(3, 5, 6);
+    game.startRound();
+    const startIdx1 = game.getState().orbitStarterIndex;
+
+    for (let r = 0; r < 6; r++) playThroughRound(game, players, 'out');
+
+    game.startRound();
+    expect(game.getState().orbitStarterIndex).toBe((startIdx1 + 1) % 3);
   });
 });

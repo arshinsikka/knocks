@@ -29,9 +29,50 @@ export const HAND_RANK: Record<HandType, number> = {
   high_card: 1,
 };
 
-export interface ClassifiedHand {
+/** Common interface satisfied by ClassifiedHand (rounds 1-5) and PokerHand (round 6) */
+export interface BestHand {
+  type: string;
+  values: number[];
+  cards: Card[];
+}
+
+export interface ClassifiedHand extends BestHand {
   type: HandType;
   /** Primary sort keys (descending for normal, ascending for muflis) */
+  values: number[];
+  cards: Card[];
+}
+
+// ── Poker (Round 6) ───────────────────────────────────────────────────────────
+
+export type PokerHandType =
+  | 'royal_flush'
+  | 'straight_flush'
+  | 'four_of_a_kind'
+  | 'full_house'
+  | 'flush'
+  | 'straight'
+  | 'three_of_a_kind'
+  | 'two_pair'
+  | 'one_pair'
+  | 'high_card';
+
+export const POKER_HAND_RANK: Record<PokerHandType, number> = {
+  royal_flush:     10,
+  straight_flush:   9,
+  four_of_a_kind:   8,
+  full_house:       7,
+  flush:            6,
+  straight:         5,
+  three_of_a_kind:  4,
+  two_pair:         3,
+  one_pair:         2,
+  high_card:        1,
+};
+
+export interface PokerHand extends BestHand {
+  type: PokerHandType;
+  /** Comparison keys: higher values = better hand */
   values: number[];
   cards: Card[];
 }
@@ -53,7 +94,7 @@ export interface GamePlayer {
   name: string;
   socketId: string;
   cards: Card[];
-  bestHand: ClassifiedHand | null;
+  bestHand: BestHand | null;
   balance: number;
   knocks: number;
   choice: PlayerChoice;

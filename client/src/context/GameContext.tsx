@@ -53,13 +53,14 @@ export interface GameOverData {
 export type PlayerAction = 'in' | 'out' | 'join' | 'pass';
 
 export interface GameState {
-  gamePhase:    'LOBBY' | 'PLAYING' | 'GAME_OVER';
-  orbit:        number;
-  round:        number;
-  potTotal:     number;
-  payout:       number;
-  knockTarget:  number;
-  players:      PublicPlayer[];
+  gamePhase:      'LOBBY' | 'PLAYING' | 'GAME_OVER';
+  orbit:          number;
+  round:          number;
+  potTotal:       number;
+  payout:         number;
+  knockTarget:    number;
+  roundsPerOrbit: number;
+  players:        PublicPlayer[];
   myCards:      Card[];
   myId:         string;
   isMyTurn:     boolean;
@@ -83,13 +84,14 @@ interface GameContextValue extends GameState {
 }
 
 const DEFAULT: GameState = {
-  gamePhase:     'LOBBY',
-  orbit:         1,
-  round:         1,
-  potTotal:      0,
-  payout:        0,
-  knockTarget:   5,
-  players:       [],
+  gamePhase:      'LOBBY',
+  orbit:          1,
+  round:          1,
+  potTotal:       0,
+  payout:         0,
+  knockTarget:    5,
+  roundsPerOrbit: 5,
+  players:        [],
   myCards:       [],
   myId:          '',
   isMyTurn:      false,
@@ -113,9 +115,10 @@ const GameContext = createContext<GameContextValue>({
 export function GameProvider({
   children,
   knockTarget,
+  roundsPerOrbit = 5,
   roomCode,
-}: { children: ReactNode; knockTarget: number; roomCode: string }) {
-  const [state, setState] = useState<GameState>({ ...DEFAULT, knockTarget });
+}: { children: ReactNode; knockTarget: number; roundsPerOrbit?: number; roomCode: string }) {
+  const [state, setState] = useState<GameState>({ ...DEFAULT, knockTarget, roundsPerOrbit });
 
   const patch = useCallback((p: Partial<GameState>) =>
     setState((prev) => ({ ...prev, ...p })), []);
@@ -130,13 +133,15 @@ export function GameProvider({
     if (socket.connected) setId(); else socket.once('connect', setId);
 
     const onRoundStarted = (d: {
-      orbit: number; round: number; knockTarget: number;
+      orbit: number; round: number; knockTarget: number; roundsPerOrbit?: number;
       potTotal: number; payout: number; startingPlayerName: string;
       players: PublicPlayer[];
     }) => {
       patch({
         gamePhase: 'PLAYING', orbit: d.orbit, round: d.round,
-        knockTarget: d.knockTarget, potTotal: d.potTotal, payout: d.payout,
+        knockTarget: d.knockTarget,
+        ...(d.roundsPerOrbit !== undefined ? { roundsPerOrbit: d.roundsPerOrbit } : {}),
+        potTotal: d.potTotal, payout: d.payout,
         players: d.players, myCards: [], isMyTurn: false, turnPhase: null,
         waitingFor: null, latestKnock: null,
         // showdownData intentionally NOT cleared here — the overlay manages
@@ -227,13 +232,15 @@ export function GameProvider({
 
     const onStateSnapshot = (d: {
       orbit: number; round: number; potTotal: number; payout?: number;
-      phase: string; knockTarget: number; players: PublicPlayer[]; myCards: Card[];
+      phase: string; knockTarget: number; roundsPerOrbit?: number;
+      players: PublicPlayer[]; myCards: Card[];
       waitingFor?: { playerName: string; phase: string } | null;
       myId?: string;
     }) => patch({
       gamePhase: 'PLAYING', orbit: d.orbit, round: d.round,
       potTotal: d.potTotal, payout: d.payout ?? 0,
       knockTarget: d.knockTarget,
+      ...(d.roundsPerOrbit !== undefined ? { roundsPerOrbit: d.roundsPerOrbit } : {}),
       players: d.players, myCards: d.myCards, serverPhase: d.phase,
       ...(d.waitingFor !== undefined ? { waitingFor: d.waitingFor } : {}),
       // myId from server is the stable game-player ID, which survives socket reconnects.

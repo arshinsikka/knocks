@@ -1,6 +1,6 @@
 import { getBestHand, findJoker } from '../Rounds';
 import { buildDeck } from '../Deck';
-import { Card } from '../types';
+import { Card, ClassifiedHand } from '../types';
 import { classifyHand, compareHands } from '../TeenPatti';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
@@ -118,7 +118,7 @@ describe('getBestHand — round 3 spec tests', () => {
     const handB = getBestHand(cardsB, 3, allDealt);
     expect(handA.type).toBe('trail');
     expect(['sequence', 'pure_sequence']).toContain(handB.type);
-    expect(compareHands(handA, handB, 'normal', 3)).toBe(1);
+    expect(compareHands(handA as ClassifiedHand, handB as ClassifiedHand, 'normal', 3)).toBe(1);
   });
 
   // Test 4 — Tie: both best hands resolve to trail A-A-A
@@ -132,7 +132,7 @@ describe('getBestHand — round 3 spec tests', () => {
     const handB = getBestHand(cardsB, 3, allDealt);
     expect(handA.type).toBe('trail');
     expect(handB.type).toBe('trail');
-    expect(compareHands(handA, handB, 'normal', 3)).toBe(0);
+    expect(compareHands(handA as ClassifiedHand, handB as ClassifiedHand, 'normal', 3)).toBe(0);
   });
 
   // Test 5 — No joker for either (all same color) → compare flush ranks
@@ -144,7 +144,7 @@ describe('getBestHand — round 3 spec tests', () => {
     const handB = getBestHand(cardsB, 3, allDealt);
     expect(handA.type).toBe('color');
     expect(handB.type).toBe('color');
-    expect(compareHands(handA, handB, 'normal', 3)).toBe(1);
+    expect(compareHands(handA as ClassifiedHand, handB as ClassifiedHand, 'normal', 3)).toBe(1);
   });
 
   // Legacy: wild [H7, D7, SK] RRB → trail beats RBB pair
@@ -156,7 +156,7 @@ describe('getBestHand — round 3 spec tests', () => {
     const handB = getBestHand(cardsB, 3, allDealt);
     expect(handA.type).toBe('trail');
     expect(handB.type).toBe('pair');
-    expect(compareHands(handA, handB, 'normal', 3)).toBe(1);
+    expect(compareHands(handA as ClassifiedHand, handB as ClassifiedHand, 'normal', 3)).toBe(1);
   });
 });
 
