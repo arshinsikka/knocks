@@ -21,9 +21,10 @@ interface Props {
   potTotal:    number;
   serverPhase: Phase;
   isMyTurn:    boolean;
+  onLedger?:   () => void;
 }
 
-export default function StatusBar({ roomCode, orbit, round, potTotal, serverPhase, isMyTurn }: Props) {
+export default function StatusBar({ roomCode, orbit, round, potTotal, serverPhase, isMyTurn, onLedger }: Props) {
   const [copied, setCopied] = useState(false);
   const { muted, toggleMute } = useMute();
 
@@ -82,6 +83,23 @@ export default function StatusBar({ roomCode, orbit, round, potTotal, serverPhas
             >
               {badge.label}
             </div>
+          )}
+
+          {/* Ledger button */}
+          {onLedger && (
+            <button
+              onClick={onLedger}
+              style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                borderRadius: 3, padding: '2px 7px',
+                cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                letterSpacing: '0.1em', textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-outfit), sans-serif',
+              }}
+            >
+              Ledger
+            </button>
           )}
 
           {/* Mute toggle */}

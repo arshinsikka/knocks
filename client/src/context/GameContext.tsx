@@ -58,6 +58,26 @@ export interface GameOverData {
   }[];
 }
 
+export interface PlayerLedgerResult {
+  name: string;
+  knocks: number;
+  orbitFees: number;
+  showdownWinnings: number;
+  showdownLosses: number;
+  potCollected: number;
+  finalBalance: number;
+}
+
+export interface GameResult {
+  gameNumber: number;
+  winner: string;
+  winnerKnocks: number;
+  knockTarget: number;
+  orbitsPlayed: number;
+  playerResults: PlayerLedgerResult[];
+  timestamp: string;
+}
+
 export type PlayerAction = 'in' | 'out' | 'join' | 'pass';
 
 export interface GameState {

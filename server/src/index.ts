@@ -14,6 +14,26 @@ interface LobbyPlayer {
   name: string;
 }
 
+interface PlayerLedgerResult {
+  name: string;
+  knocks: number;
+  orbitFees: number;
+  showdownWinnings: number;
+  showdownLosses: number;
+  potCollected: number;
+  finalBalance: number;
+}
+
+interface GameResult {
+  gameNumber: number;
+  winner: string;
+  winnerKnocks: number;
+  knockTarget: number;
+  orbitsPlayed: number;
+  playerResults: PlayerLedgerResult[];
+  timestamp: string;
+}
+
 interface RoomState {
   code: string;
   hostId: string;
@@ -23,6 +43,7 @@ interface RoomState {
   challengeLimit: 'none' | 12 | 18 | 24;
   gameStarted: boolean;
   lastActivity: number; // Date.now() ms
+  ledger: GameResult[];
 }
 
 // ── Maps ─────────────────────────────────────────────────────────────────────
@@ -279,6 +300,26 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
 
   if (s.phase === 'GAME_OVER') {
     const winner = s.players.find((p) => p.id === s.gameOverWinner)!;
+    const room = rooms.get(roomCode);
+    const gameResult: GameResult = {
+      gameNumber: room ? room.ledger.length + 1 : 1,
+      winner: winner.name,
+      winnerKnocks: winner.knocks,
+      knockTarget: s.knockTarget,
+      orbitsPlayed: s.orbit,
+      playerResults: s.players.map((p) => ({
+        name: p.name,
+        knocks: p.knocks,
+        orbitFees: p.totalOrbitFees,
+        showdownWinnings: p.showdownWinnings,
+        showdownLosses: p.showdownLosses,
+        potCollected: p.potCollected,
+        finalBalance: p.balance,
+      })),
+      timestamp: new Date().toISOString(),
+    };
+    if (room) room.ledger.push(gameResult);
+
     io.to(roomCode).emit('game_over', {
       winnerName: winner.name,
       winnerKnocks: winner.knocks,
@@ -291,6 +332,7 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
         name, balance, knocks,
         totalOrbitFees, showdownWinnings, showdownLosses, potCollected,
       })),
+      ledger: room ? room.ledger : [],
     });
     activeGames.delete(roomCode);
     return;
@@ -413,6 +455,7 @@ io.on('connection', (socket: Socket) => {
         challengeLimit,
         gameStarted: false,
         lastActivity: Date.now(),
+        ledger: [],
       });
       socket.join(code);
 
@@ -707,6 +750,13 @@ io.on('connection', (socket: Socket) => {
         socket.emit('your_turn', { phase: waitingInfo.phase });
       }
     }
+  });
+
+  // ── GAME/LOBBY: request_ledger ──────────────────────────────────────────────
+  socket.on('request_ledger', ({ roomCode }: { roomCode: string }) => {
+    const room = rooms.get(roomCode?.toUpperCase());
+    if (!room) return;
+    socket.emit('ledger_data', { ledger: room.ledger });
   });
 
   // ── LOBBY: request_rematch ─────────────────────────────────────────────────

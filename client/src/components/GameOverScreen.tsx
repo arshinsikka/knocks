@@ -9,6 +9,7 @@ interface Props {
   data: GameOverData;
   roomCode: string;
   isHost: boolean;
+  onLedger?: () => void;
 }
 
 // Sparse particle dots — CSS only, no JS animation
@@ -105,7 +106,7 @@ function Row({ label, value, note }: { label: string; value: number; note?: stri
   );
 }
 
-export default function GameOverScreen({ data, roomCode, isHost }: Props) {
+export default function GameOverScreen({ data, roomCode, isHost, onLedger }: Props) {
   const router = useRouter();
   const [rematchPending, setRematchPending] = useState(false);
 
@@ -225,6 +226,33 @@ export default function GameOverScreen({ data, roomCode, isHost }: Props) {
             </div>
           );
         })}
+
+        {/* Ledger */}
+        <p style={{
+          textAlign: 'center', fontSize: 10, color: 'var(--text-muted)',
+          letterSpacing: '0.08em', marginTop: 4, marginBottom: 8,
+        }}>
+          Game saved to ledger
+        </p>
+        {onLedger && (
+          <button
+            onClick={onLedger}
+            style={{
+              width: '100%', marginBottom: 8,
+              padding: '12px 0',
+              fontSize: 12, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              background: 'transparent',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 8,
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-outfit), sans-serif',
+            }}
+          >
+            View Ledger
+          </button>
+        )}
 
         {/* Rematch */}
         {isHost ? (

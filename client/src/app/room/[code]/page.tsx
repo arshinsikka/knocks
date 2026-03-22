@@ -13,7 +13,9 @@ import ShowdownOverlay, { ShowdownToast } from '@/components/ShowdownOverlay';
 import KnockBanner    from '@/components/KnockBanner';
 import GameOverScreen from '@/components/GameOverScreen';
 import ReconnectBanner from '@/components/ReconnectBanner';
+import LedgerPanel    from '@/components/LedgerPanel';
 import { sounds } from '@/lib/sounds';
+import { GameResult } from '@/context/GameContext';
 
 // ── Player Ring ───────────────────────────────────────────────────────────────
 
@@ -62,7 +64,7 @@ function PlayerRing() {
 
 // ── Game Board ────────────────────────────────────────────────────────────────
 
-function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
+function GameBoard({ roomCode, hostId, onLedger }: { roomCode: string; hostId: string; onLedger: () => void }) {
   const {
     orbit, round, potTotal, payout, knockTarget,
     players, myCards, selectedCards, myId,
@@ -126,7 +128,7 @@ function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameOver]);
 
-  if (gameOver) return <GameOverScreen data={gameOver} roomCode={roomCode} isHost={isHost} />;
+  if (gameOver) return <GameOverScreen data={gameOver} roomCode={roomCode} isHost={isHost} onLedger={onLedger} />;
 
   return (
     <div style={{
@@ -147,6 +149,7 @@ function GameBoard({ roomCode, hostId }: { roomCode: string; hostId: string }) {
         potTotal={potTotal}
         serverPhase={serverPhase}
         isMyTurn={isMyTurn}
+        onLedger={onLedger}
       />
 
       {/* Zone 2 — Player Ring */}
@@ -212,7 +215,7 @@ interface StoredSession {
   players: LobbyPlayer[]; hostId: string;
 }
 
-function LobbyView({ code, session }: { code: string; session: StoredSession }) {
+function LobbyView({ code, session, onLedger, hasLedger }: { code: string; session: StoredSession; onLedger: () => void; hasLedger: boolean }) {
   const [players,  setPlayers]  = useState<LobbyPlayer[]>(session.players);
   const [hostId,   setHostId]   = useState(session.hostId);
   const [copied,   setCopied]   = useState(false);
@@ -451,6 +454,26 @@ function LobbyView({ code, session }: { code: string; session: StoredSession }) 
             {error}
           </p>
         )}
+
+        {hasLedger && (
+          <button
+            onClick={onLedger}
+            style={{
+              width: '100%', marginTop: 16,
+              padding: '12px 0',
+              fontSize: 11, fontWeight: 500,
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+              background: 'transparent',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 8,
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-outfit), sans-serif',
+            }}
+          >
+            View Ledger
+          </button>
+        )}
       </div>
     </div>
   );
@@ -465,6 +488,11 @@ export default function RoomPage() {
 
   const [session,     setSession]     = useState<StoredSession | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
+  const [ledger,      setLedger]      = useState<GameResult[]>([]);
+  const [ledgerOpen,  setLedgerOpen]  = useState(false);
+
+  const openLedger  = useCallback(() => setLedgerOpen(true), []);
+  const closeLedger = useCallback(() => setLedgerOpen(false), []);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('knocks_session');
@@ -494,6 +522,19 @@ export default function RoomPage() {
     };
     socket.on('rematch_started', onRematchStarted);
 
+    // Capture ledger from game_over
+    const onGameOver = (d: { ledger?: GameResult[] }) => {
+      if (d.ledger) setLedger(d.ledger);
+    };
+    socket.on('game_over', onGameOver);
+
+    // Receive ledger on demand
+    const onLedgerData = (d: { ledger: GameResult[] }) => setLedger(d.ledger);
+    socket.on('ledger_data', onLedgerData);
+
+    // Fetch existing ledger (covers page refresh / rematch)
+    socket.emit('request_ledger', { roomCode: code });
+
     // Re-join the server room on every reconnect (handles network blips in the
     // lobby where ReconnectBanner isn't mounted, and supplements it mid-game).
     let wasConnected = socket.connected;
@@ -501,6 +542,7 @@ export default function RoomPage() {
       if (wasConnected) {
         // Genuine reconnect — not the initial connection event
         socket.emit('rejoin_game', { roomCode: code, playerName: parsed.playerName });
+        socket.emit('request_ledger', { roomCode: code });
       }
       wasConnected = true;
     };
@@ -510,20 +552,31 @@ export default function RoomPage() {
       socket.off('game_started', onGameStarted);
       socket.off('state_snapshot', onSnapshot);
       socket.off('rematch_started', onRematchStarted);
+      socket.off('game_over', onGameOver);
+      socket.off('ledger_data', onLedgerData);
       socket.off('connect', onReconnect);
     };
   }, [code, router]);
 
   if (!session) return null;
 
-  if (!gameStarted) {
-    return <LobbyView code={code} session={session} />;
-  }
-
   return (
-    <GameProvider knockTarget={session.knockTarget} roundsPerOrbit={session.roundsPerOrbit ?? 5} roomCode={code}>
-      <ReconnectBanner roomCode={code} playerName={session.playerName} />
-      <GameBoard roomCode={code} hostId={session.hostId} />
-    </GameProvider>
+    <>
+      {!gameStarted ? (
+        <LobbyView
+          code={code}
+          session={session}
+          onLedger={openLedger}
+          hasLedger={ledger.length > 0}
+        />
+      ) : (
+        <GameProvider knockTarget={session.knockTarget} roundsPerOrbit={session.roundsPerOrbit ?? 5} roomCode={code}>
+          <ReconnectBanner roomCode={code} playerName={session.playerName} />
+          <GameBoard roomCode={code} hostId={session.hostId} onLedger={openLedger} />
+        </GameProvider>
+      )}
+
+      {ledgerOpen && <LedgerPanel ledger={ledger} onClose={closeLedger} />}
+    </>
   );
 }
