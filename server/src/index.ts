@@ -5,6 +5,7 @@ import cors from 'cors';
 import { GameRoom } from './game/GameRoom';
 import { calculatePayout } from './game/Pot';
 import { Card, BestHand, GamePlayer } from './game/types';
+import { findJoker } from './game/Rounds';
 
 // ── Lobby types ───────────────────────────────────────────────────────────────
 
@@ -164,6 +165,46 @@ function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   }
 }
 
+// ── Showdown card data helper ──────────────────────────────────────────────────
+
+function cardKey(c: Card): string { return `${c.rank}-${c.suit}`; }
+
+function getShowdownCardData(pp: GamePlayer, round: number): {
+  cards: Card[];
+  imaginedCard?: Card;
+  jokerTriggered?: boolean;
+  jokerOriginalCard?: Card;
+  jokerBecame?: Card;
+} {
+  const bestHand = pp.bestHand!;
+
+  if (round === 2) {
+    // Send the 2 real dealt cards; identify imagined 3rd from bestHand
+    const realKeys = new Set(pp.cards.map(cardKey));
+    const imaginedCard = bestHand.cards.find((c) => !realKeys.has(cardKey(c)));
+    return { cards: pp.cards, imaginedCard };
+  }
+
+  if (round === 3) {
+    const jokerCard = findJoker(pp.cards as [Card, Card, Card]);
+    if (jokerCard) {
+      const realCards = pp.cards.filter((c) => c !== jokerCard);
+      const realKeys = new Set(realCards.map(cardKey));
+      const jokerBecame = bestHand.cards.find((c) => !realKeys.has(cardKey(c)));
+      return {
+        cards: pp.cards,
+        jokerTriggered: true,
+        jokerOriginalCard: jokerCard,
+        jokerBecame,
+      };
+    }
+    return { cards: pp.cards, jokerTriggered: false };
+  }
+
+  // Rounds 1, 4, 5, 6: bestHand.cards already contains the correct subset
+  return { cards: bestHand.cards };
+}
+
 function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
   clearTurnTimer(roomCode);
   const summary = game.resolveRound();
@@ -191,15 +232,20 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
 
     for (const p of participants) {
       io.to(p.socketId).emit('showdown_reveal', {
-        participants: participants.map((pp) => ({
-          name: pp.name,
-          cards: pp.cards,
-          bestHand: allHandsMap.get(pp.id),
-          handType: allHandsMap.get(pp.id)?.type,
-          role: pp.id === summary.winner ? 'winner'
-              : payerIdSet.has(pp.id) ? 'payer'
-              : 'safe',
-        })),
+        round: s.round,
+        participants: participants.map((pp) => {
+          const hand = allHandsMap.get(pp.id)!;
+          const cardData = getShowdownCardData(pp, s.round);
+          return {
+            name: pp.name,
+            handType: hand?.type,
+            handValues: hand?.values ?? [],
+            role: pp.id === summary.winner ? 'winner'
+                : payerIdSet.has(pp.id) ? 'payer'
+                : 'safe',
+            ...cardData,
+          };
+        }),
         winner: winnerPlayer?.name ?? null,
         payout: summary.payout,
         eachPayerPays,

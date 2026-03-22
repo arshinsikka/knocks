@@ -22,10 +22,18 @@ export interface ShowdownParticipant {
   name: string;
   cards: Card[];
   handType: string;
+  handValues: number[];
   role: 'winner' | 'payer' | 'safe';
+  // Round 2
+  imaginedCard?: Card;
+  // Round 3
+  jokerTriggered?: boolean;
+  jokerOriginalCard?: Card;
+  jokerBecame?: Card;
 }
 
 export interface ShowdownData {
+  round: number;
   participants: ShowdownParticipant[];
   winner: string | null;
   payout: number;
@@ -191,7 +199,7 @@ export function GameProvider({
     };
 
     const onShowdownReveal = (d: {
-      participants: ShowdownParticipant[];
+      round: number; participants: ShowdownParticipant[];
       winner: string | null; payout: number; eachPayerPays: number; tie?: boolean;
     }) => patch({
       isMyTurn: false, turnPhase: null,
@@ -205,7 +213,10 @@ export function GameProvider({
     }) => patch({
       isMyTurn: false, turnPhase: null,
       showdownData: {
-        participants: d.participantNames.map((name) => ({ name, cards: [], handType: '', role: 'safe' as const })),
+        round: 0,
+        participants: d.participantNames.map((name) => ({
+          name, cards: [], handType: '', handValues: [], role: 'safe' as const,
+        })),
         winner: d.winnerName, payout: d.payout,
         eachPayerPays: d.eachPayerPays, isPublic: true, tie: d.tie ?? false,
       },
