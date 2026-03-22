@@ -47,28 +47,28 @@ describe('classifyHand — type detection', () => {
     expect(h.type).toBe('high_card');
   });
 
-  test('A-K-Q is highest pure_sequence', () => {
+  test('A-K-Q is highest sequence (rank 12)', () => {
     const h = classifyHand([c(14, S), c(13, H), c(12, D)]);
     expect(h.type).toBe('sequence');
-    expect(h.values[0]).toBe(14);
+    expect(h.values[0]).toBe(12);
   });
 
-  test('A-K-Q same suit is highest pure_sequence', () => {
+  test('A-K-Q same suit is highest pure_sequence (rank 12)', () => {
     const h = classifyHand([c(14, S), c(13, S), c(12, S)]);
     expect(h.type).toBe('pure_sequence');
-    expect(h.values[0]).toBe(14);
+    expect(h.values[0]).toBe(12);
   });
 
-  test('A-2-3 is lowest sequence (Ace wraps low)', () => {
+  test('A-2-3 is second-highest sequence (rank 11)', () => {
     const h = classifyHand([c(14, S), c(2, H), c(3, D)]);
     expect(h.type).toBe('sequence');
-    expect(h.values).toEqual([3, 2, 1]); // Ace treated as 1
+    expect(h.values).toEqual([11]);
   });
 
-  test('A-2-3 same suit is lowest pure_sequence', () => {
+  test('A-2-3 same suit is second-highest pure_sequence (rank 11)', () => {
     const h = classifyHand([c(14, S), c(2, S), c(3, S)]);
     expect(h.type).toBe('pure_sequence');
-    expect(h.values).toEqual([3, 2, 1]);
+    expect(h.values).toEqual([11]);
   });
 
   test('K-A-2 is NOT a sequence', () => {
@@ -121,6 +121,48 @@ describe('compareHands — normal mode', () => {
     const high = classifyHand([c(14, S), c(13, H), c(12, D)]);
     const low = classifyHand([c(14, H), c(2, D), c(3, C)]);
     expect(compareHands(high, low, 'normal')).toBe(1);
+  });
+
+  test('A-2-3 sequence beats K-Q-J sequence', () => {
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    const kqj = classifyHand([c(13, S), c(12, H), c(11, D)]);
+    expect(compareHands(a23, kqj, 'normal')).toBe(1);
+  });
+
+  test('A-2-3 sequence beats 5-4-3 sequence', () => {
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    const s543 = classifyHand([c(5, S), c(4, H), c(3, D)]);
+    expect(compareHands(a23, s543, 'normal')).toBe(1);
+  });
+
+  test('A-2-3 sequence beats 4-3-2 sequence', () => {
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    const s432 = classifyHand([c(4, S), c(3, H), c(2, D)]);
+    expect(compareHands(a23, s432, 'normal')).toBe(1);
+  });
+
+  test('4-3-2 is the lowest sequence (rank 1)', () => {
+    const s432 = classifyHand([c(4, S), c(3, H), c(2, D)]);
+    expect(s432.type).toBe('sequence');
+    expect(s432.values[0]).toBe(1);
+  });
+
+  test('A-2-3 pure sequence beats K-Q-J pure sequence', () => {
+    const a23ps = classifyHand([c(14, S), c(2, S), c(3, S)]);
+    const kqjps = classifyHand([c(13, H), c(12, H), c(11, H)]);
+    expect(compareHands(a23ps, kqjps, 'normal')).toBe(1);
+  });
+
+  test('A-K-Q pure sequence beats A-2-3 pure sequence', () => {
+    const akqps = classifyHand([c(14, S), c(13, S), c(12, S)]);
+    const a23ps = classifyHand([c(14, H), c(2, H), c(3, H)]);
+    expect(compareHands(akqps, a23ps, 'normal')).toBe(1);
+  });
+
+  test('4-3-2 pure sequence is the lowest (rank 1)', () => {
+    const ps432 = classifyHand([c(4, S), c(3, S), c(2, S)]);
+    expect(ps432.type).toBe('pure_sequence');
+    expect(ps432.values[0]).toBe(1);
   });
 
   test('same type: higher values win — color', () => {
@@ -210,5 +252,17 @@ describe('compareHands — muflis mode', () => {
     // In normal high_card muflis: lower wins, so 2-3-4 would beat 2-3-5 on values alone
     // But 2-3-5 has the absolute special rule overriding
     expect(compareHands(hand235, hand234, 'muflis')).toBe(1);
+  });
+
+  test('muflis: 4-3-2 sequence beats A-2-3 sequence (reversed ranking)', () => {
+    const s432 = classifyHand([c(4, S), c(3, H), c(2, D)]);
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    expect(compareHands(s432, a23, 'muflis')).toBe(1);
+  });
+
+  test('muflis: A-2-3 sequence beats A-K-Q sequence (reversed ranking)', () => {
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    const akq = classifyHand([c(14, H), c(13, D), c(12, C)]);
+    expect(compareHands(a23, akq, 'muflis')).toBe(1);
   });
 });

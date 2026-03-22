@@ -13,19 +13,21 @@ function isFlush(cards: Card[]): boolean {
 }
 
 /**
- * Returns the sequence rank-triple if the three cards form a straight,
- * else null.  Ace wraps LOW only in A-2-3 (returns [3,2,1] for sort).
- * K-A-2 is NOT a sequence.
+ * Returns [sequenceRank] if the three cards form a straight, else null.
+ * Sequence rank (highest→lowest):
+ *   A-K-Q=12, A-2-3=11, K-Q-J=10, Q-J-10=9, … 4-3-2=1
+ * Ace wraps in A-K-Q and A-2-3 only. K-A-2 is NOT a sequence.
  */
 function sequenceValues(cards: Card[]): number[] | null {
   const ranks = sorted(cards).map((c) => c.rank);
-  // Normal straight
-  if (ranks[0] - ranks[1] === 1 && ranks[1] - ranks[2] === 1) {
-    return ranks;
-  }
-  // A-2-3  (sorted = [14,3,2])
+  // A-2-3  (sorted = [14,3,2]) — second highest sequence
   if (ranks[0] === 14 && ranks[1] === 3 && ranks[2] === 2) {
-    return [3, 2, 1]; // treat Ace as 1 for comparison
+    return [11];
+  }
+  // Normal straight (includes A-K-Q)
+  if (ranks[0] - ranks[1] === 1 && ranks[1] - ranks[2] === 1) {
+    // A-K-Q (top=14) gets rank 12; all others: topCard - 3 (4-3-2→1 … K-Q-J→10)
+    return ranks[0] === 14 ? [12] : [ranks[0] - 3];
   }
   return null;
 }
