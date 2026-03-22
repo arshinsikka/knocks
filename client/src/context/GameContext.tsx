@@ -191,22 +191,17 @@ export function GameProvider({
 
     const onWaitingFor = (d: { playerName: string; phase: string }) => {
       console.log('[GameContext] waiting_for received:', d);
-      setState((prev) => {
-        const myName = prev.players.find((p) => p.id === prev.myId)?.name;
-        // Keep serverPhase in sync — the server never sends a dedicated
-        // phase-change event for CHALLENGE_JOIN, so we derive it here.
-        const newServerPhase =
-          d.phase === 'challenge_join' ? 'CHALLENGE_JOIN'
-          : d.phase === 'in_out'       ? 'IN_OUT'
-          : prev.serverPhase;
-        return {
-          ...prev,
-          waitingFor: d,
-          serverPhase: newServerPhase,
-          // The active player also receives waiting_for (room broadcast).
-          // Don't clear isMyTurn if it's actually our turn.
-          isMyTurn: myName === d.playerName ? prev.isMyTurn : false,
-        };
+      // Always set isMyTurn: false here. The server always emits waiting_for
+      // immediately BEFORE your_turn on the same socket, so if it IS our turn
+      // your_turn will override this to true in the very next update.
+      // Relying on a players.find() lookup to conditionally preserve isMyTurn
+      // was fragile: if myId hadn't been set yet (race on first render) the
+      // lookup returned undefined and isMyTurn was incorrectly cleared for
+      // everyone, causing acted to get stuck and buttons to appear disabled.
+      patch({
+        waitingFor: d,
+        serverPhase: d.phase === 'challenge_join' ? 'CHALLENGE_JOIN' : 'IN_OUT',
+        isMyTurn: false,
       });
     };
 
@@ -319,10 +314,10 @@ export function GameProvider({
   return (
     <GameContext.Provider value={{
       ...state,
-      emitIn:  useCallback(() => { console.log('[GameContext] emit action_in');   getSocket().emit('action_in');   }, []),
-      emitOut: useCallback(() => { console.log('[GameContext] emit action_out');  getSocket().emit('action_out');  }, []),
-      emitJoin: useCallback(() => { console.log('[GameContext] emit action_join'); getSocket().emit('action_join'); }, []),
-      emitPass: useCallback(() => { console.log('[GameContext] emit action_pass'); getSocket().emit('action_pass'); }, []),
+      emitIn:  useCallback(() => { console.log('[GameContext] emit action_in');   getSocket().emit('action_in');   patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
+      emitOut: useCallback(() => { console.log('[GameContext] emit action_out');  getSocket().emit('action_out');  patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
+      emitJoin: useCallback(() => { console.log('[GameContext] emit action_join'); getSocket().emit('action_join'); patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
+      emitPass: useCallback(() => { console.log('[GameContext] emit action_pass'); getSocket().emit('action_pass'); patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
       dismissShowdown: useCallback(() => patch({ showdownData: null }), [patch]),
       dismissKnock:    useCallback(() => patch({ latestKnock: null }),   [patch]),
     }}>
