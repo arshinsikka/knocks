@@ -181,8 +181,8 @@ function emitRoundStart(io: Server, game: GameRoom, roomCode: string) {
   const actor = game.currentActor();
   if (actor) {
     console.log(`[turn] ${roomCode} IN_OUT → "${actor.name}" (${actor.socketId})`);
-    io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
     io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'in_out' });
+    io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
     startTurnTimer(io, game, roomCode, actor, 'in_out');
   }
 }
@@ -367,8 +367,8 @@ function afterInOut(io: Server, game: GameRoom, roomCode: string) {
     const actor = game.currentChallengeJoinActor();
     if (actor) {
       console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
-      io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
+      io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       startTurnTimer(io, game, roomCode, actor, 'challenge_join');
     }
   } else {
@@ -376,8 +376,8 @@ function afterInOut(io: Server, game: GameRoom, roomCode: string) {
     const actor = game.currentActor();
     if (actor) {
       console.log(`[turn] ${roomCode} IN_OUT → "${actor.name}" (${actor.socketId})`);
-      io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'in_out' });
+      io.to(actor.socketId).emit('your_turn', { phase: 'in_out' });
       startTurnTimer(io, game, roomCode, actor, 'in_out');
     }
   }
@@ -394,8 +394,8 @@ function afterChallengeJoin(io: Server, game: GameRoom, roomCode: string) {
     const actor = game.currentChallengeJoinActor();
     if (actor) {
       console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
-      io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
+      io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
       startTurnTimer(io, game, roomCode, actor, 'challenge_join');
     }
   }
