@@ -430,7 +430,15 @@ app.get('/health', (_req, res) => {
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  maxHttpBufferSize: 1e6,
   cors: { origin: corsOrigin, methods: ['GET', 'POST'] },
+});
+
+io.engine.on('connection_error', (err: { code: string; message: string }) => {
+  console.log('[engine] Connection error:', err.code, err.message);
 });
 
 io.on('connection', (socket: Socket) => {
@@ -830,6 +838,11 @@ io.on('connection', (socket: Socket) => {
     console.log(`[room] ${upper} player "${playerName}" left lobby (players: ${room.players.length})`);
   });
 
+  // ── heartbeat ────────────────────────────────────────────────────────────────
+  socket.on('ping', () => {
+    socket.emit('pong');
+  });
+
   // ── disconnect ───────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`[-] ${socket.id}`);
@@ -913,6 +926,21 @@ setInterval(() => {
     }
   }
 }, CLEANUP_INTERVAL_MS);
+
+// ── Memory usage logging (every 60 s) ────────────────────────────────────────
+
+setInterval(() => {
+  const mem = process.memoryUsage();
+  console.log(`[mem] RSS=${Math.round(mem.rss / 1024 / 1024)}MB Heap=${Math.round(mem.heapUsed / 1024 / 1024)}MB Rooms=${rooms.size}`);
+}, 60_000);
+
+// ── Keep-alive self-ping (every 5 min) to prevent Render spindown ─────────────
+
+setInterval(() => {
+  if (rooms.size > 0) {
+    fetch(`http://localhost:${PORT}/health`).catch(() => {});
+  }
+}, 300_000);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 

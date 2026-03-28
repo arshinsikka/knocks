@@ -8,15 +8,16 @@ let socket: Socket | null = null;
 export function getSocket(): Socket {
   if (!socket) {
     socket = io(SOCKET_URL, {
-      // Try WebSocket first — avoids the polling→WS upgrade disconnect that
-      // would otherwise flash the reconnect banner on every page load.
-      transports: ['websocket', 'polling'],
+      // WebSocket only — skip polling entirely to avoid upgrade-related
+      // brief disconnects and to reduce server load.
+      transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 16000,
-      randomizationFactor: 0.5,
+      reconnectionDelayMax: 5000,
+      timeout: 60000,
+      forceNew: false,
     });
   }
   console.log(`Socket: ${socket.connected ? 'reusing existing' : 'creating new'}`);
