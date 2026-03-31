@@ -245,6 +245,10 @@ export class GameRoom {
         s.round,
         s.allDealtCards,
       );
+      // Write evaluated bestHand back so getShowdownCardData reads the correct hand
+      for (const { player, hand } of result.allHands) {
+        player.bestHand = hand;
+      }
       if (!result.tie) {
         // Clear winner — only payers (worst hand) pay; safe players unchanged
         winner = result.winner;
