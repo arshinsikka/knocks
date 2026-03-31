@@ -8,6 +8,7 @@ interface Props {
   isMe:          boolean;
   isActiveTurn:  boolean;
   choice:        PlayerAction | undefined;
+  isMatchPoint?: boolean;
   hasSeenCards?: boolean;
   onEyeClick?:   () => void;
 }
@@ -63,13 +64,20 @@ function ChoiceBadge({ choice }: { choice: PlayerAction }) {
 }
 
 export default function PlayerSlot({
-  player, knockTarget, isMe, isActiveTurn, choice, hasSeenCards = false, onEyeClick,
+  player, knockTarget, isMe, isActiveTurn, choice, isMatchPoint = false, hasSeenCards = false, onEyeClick,
 }: Props) {
   const name = player.name.length > 10 ? player.name.slice(0, 9) + '\u2026' : player.name;
 
+  const borderClass = isActiveTurn ? 'turn-glow' : isMatchPoint ? 'match-border-pulse' : '';
+  const borderColor = isActiveTurn
+    ? 'var(--border-bright)'
+    : isMatchPoint
+    ? '#ffffff'
+    : 'var(--border-subtle)';
+
   return (
     <div
-      className={isActiveTurn ? 'turn-glow' : ''}
+      className={borderClass}
       style={{
         display:        'flex',
         flexDirection:  'column',
@@ -77,7 +85,7 @@ export default function PlayerSlot({
         gap:            4,
         padding:        '8px 10px',
         background:     'var(--bg-surface)',
-        border:         `1px solid ${isActiveTurn ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+        border:         `1px solid ${borderColor}`,
         borderRadius:   6,
         minWidth:       88,
         maxWidth:       110,
@@ -128,6 +136,23 @@ export default function PlayerSlot({
 
       {/* Knock dots */}
       <KnockDots filled={player.knocks} total={knockTarget} />
+
+      {/* Match point badge */}
+      {isMatchPoint && (
+        <div
+          className="match-text-pulse"
+          style={{
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: '#ffffff',
+            fontFamily: 'var(--font-outfit), sans-serif',
+          }}
+        >
+          Match Point
+        </div>
+      )}
 
       {/* Choice badge */}
       {choice ? (

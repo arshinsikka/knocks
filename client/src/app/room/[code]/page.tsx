@@ -10,7 +10,8 @@ import HandTray       from '@/components/HandTray';
 import ActionBar      from '@/components/ActionBar';
 import PlayerSlot     from '@/components/PlayerSlot';
 import ShowdownOverlay, { ShowdownToast } from '@/components/ShowdownOverlay';
-import KnockBanner    from '@/components/KnockBanner';
+import KnockBanner        from '@/components/KnockBanner';
+import MatchPointBanner   from '@/components/MatchPointBanner';
 import GameOverScreen from '@/components/GameOverScreen';
 import ReconnectBanner from '@/components/ReconnectBanner';
 import LedgerPanel    from '@/components/LedgerPanel';
@@ -88,6 +89,10 @@ function PlayerRing() {
     orbit, revealedCardCache, requestRevealedCards,
   } = useGame();
 
+  const matchPointIds = new Set(
+    players.filter((p) => p.knocks === knockTarget - 1).map((p) => p.id),
+  );
+
   const [eyePlayerId, setEyePlayerId] = useState<string | null>(null);
 
   const me        = players.find((p) => p.id === myId);
@@ -138,6 +143,7 @@ function PlayerRing() {
                 isMe={false}
                 isActiveTurn={waitingFor?.playerName === p.name}
                 choice={playerChoices[p.name]}
+                isMatchPoint={matchPointIds.has(p.id)}
                 hasSeenCards={hasSeen}
                 onEyeClick={() => handleEyeClick(p.id, p.name)}
               />
@@ -161,6 +167,7 @@ function PlayerRing() {
           isMe
           isActiveTurn={false}
           choice={playerChoices[me.name]}
+          isMatchPoint={matchPointIds.has(me.id)}
         />
       )}
     </div>
@@ -181,6 +188,10 @@ function GameBoard({ roomCode, hostId, onLedger }: { roomCode: string; hostId: s
 
   const myName = players.find((p) => p.id === myId)?.name ?? '';
   const isHost = myId === hostId;
+
+  const matchPointNames = players
+    .filter((p) => p.knocks === knockTarget - 1)
+    .map((p) => p.name);
 
   // ── Sound effects (all hooks before early return — React rules) ─────────────
 
@@ -256,6 +267,9 @@ function GameBoard({ roomCode, hostId, onLedger }: { roomCode: string; hostId: s
         isMyTurn={isMyTurn}
         onLedger={onLedger}
       />
+
+      {/* Match point banner — overlays top of Zone 2 */}
+      <MatchPointBanner names={matchPointNames} />
 
       {/* Zone 2 — Player Ring */}
       <PlayerRing />
