@@ -244,7 +244,7 @@ export function GameProvider({
           isMyTurn: false, turnPhase: null,
           showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
           serverPhase: 'SHOWDOWN',
-          seenPlayerIds: [...newSeenIds],
+          seenPlayerIds: Array.from(newSeenIds),
         };
       });
     };
