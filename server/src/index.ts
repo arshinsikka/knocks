@@ -275,6 +275,15 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
       });
     }
 
+    // Record card memory so participants can recall what they saw later this orbit
+    game.recordRevealedCards(
+      participants.map((pp) => ({
+        id: pp.id,
+        shownCards: getShowdownCardData(pp, s.round).cards,
+      })),
+      s.round,
+    );
+
     // showdown_public → non-participants (no cards)
     for (const p of nonParticipants) {
       io.to(p.socketId).emit('showdown_public', {
@@ -758,6 +767,25 @@ io.on('connection', (socket: Socket) => {
         socket.emit('your_turn', { phase: waitingInfo.phase });
       }
     }
+  });
+
+  // ── GAME: request_revealed_cards ────────────────────────────────────────────
+  // Player requests cards they previously saw of a specific opponent in a showdown.
+  // Server verifies they actually saw those cards before responding.
+  socket.on('request_revealed_cards', ({ targetPlayerId }: { targetPlayerId: string }) => {
+    const found = findGameBySocket(socket.id);
+    if (!found) return;
+    const [, game, observer] = found;
+    const s = game.getState();
+    const target = s.players.find((p) => p.id === targetPlayerId);
+    if (!target) return;
+    const { cards, rounds } = game.getRevealedCards(observer.id, targetPlayerId);
+    socket.emit('revealed_cards_data', {
+      targetPlayerId,
+      targetPlayerName: target.name,
+      cards,
+      rounds,
+    });
   });
 
   // ── GAME/LOBBY: request_ledger ──────────────────────────────────────────────

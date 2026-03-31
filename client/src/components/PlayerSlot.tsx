@@ -3,11 +3,13 @@
 import { PublicPlayer, PlayerAction } from '@/context/GameContext';
 
 interface Props {
-  player:       PublicPlayer;
-  knockTarget:  number;
-  isMe:         boolean;
-  isActiveTurn: boolean;
-  choice:       PlayerAction | undefined;
+  player:        PublicPlayer;
+  knockTarget:   number;
+  isMe:          boolean;
+  isActiveTurn:  boolean;
+  choice:        PlayerAction | undefined;
+  hasSeenCards?: boolean;
+  onEyeClick?:   () => void;
 }
 
 function KnockDots({ filled, total }: { filled: number; total: number }) {
@@ -60,7 +62,9 @@ function ChoiceBadge({ choice }: { choice: PlayerAction }) {
   );
 }
 
-export default function PlayerSlot({ player, knockTarget, isMe, isActiveTurn, choice }: Props) {
+export default function PlayerSlot({
+  player, knockTarget, isMe, isActiveTurn, choice, hasSeenCards = false, onEyeClick,
+}: Props) {
   const name = player.name.length > 10 ? player.name.slice(0, 9) + '\u2026' : player.name;
 
   return (
@@ -132,6 +136,30 @@ export default function PlayerSlot({ player, knockTarget, isMe, isActiveTurn, ch
         <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
           &mdash;
         </div>
+      )}
+
+      {/* Eye icon — shows when opponent cards have been seen in a showdown */}
+      {!isMe && (
+        <button
+          onClick={(e) => { e.stopPropagation(); if (hasSeenCards && onEyeClick) onEyeClick(); }}
+          title={hasSeenCards ? 'View recalled cards' : 'No cards seen yet'}
+          style={{
+            position: 'absolute', bottom: 4, right: 4,
+            background: 'none', border: 'none', padding: 2,
+            cursor: hasSeenCards ? 'pointer' : 'default',
+            lineHeight: 1,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="12" cy="12" rx="10" ry="6"
+              stroke={hasSeenCards ? '#ffffff' : '#444444'} strokeWidth="2" />
+            <circle cx="12" cy="12" r="3"
+              fill={hasSeenCards ? '#ffffff' : '#444444'} />
+            {hasSeenCards && (
+              <circle cx="18" cy="6" r="3" fill="#ffffff" />
+            )}
+          </svg>
+        </button>
       )}
     </div>
   );

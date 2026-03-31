@@ -33,6 +33,8 @@ export interface GameRoomState {
   allDealtCards: Card[];         // accumulates across rounds within an orbit
   lastSummary: RoundSummary | null;
   gameOverWinner: string | null; // playerId
+  // Card memory: observerId → targetId → { cards seen, rounds they appeared in }
+  revealedCards: Record<string, Record<string, { cards: Card[]; rounds: number[] }>>;
 }
 
 export class GameRoom {
@@ -76,6 +78,7 @@ export class GameRoom {
       allDealtCards: [],
       lastSummary: null,
       gameOverWinner: null,
+      revealedCards: {},
     };
   }
 
@@ -104,6 +107,7 @@ export class GameRoom {
       }
       s.orbitDeck = shuffle(buildDeck());
       s.allDealtCards = [];
+      s.revealedCards = {};
       for (const p of s.players) {
         p.cards = [];
       }
@@ -316,6 +320,43 @@ export class GameRoom {
     const s = this.state;
     if (s.phase !== 'IN_OUT') return null;
     return s.players[s.currentTurnIndex] ?? null;
+  }
+
+  /**
+   * Record which cards each showdown participant saw of every other participant.
+   * Cards are merged across rounds (same card by rank+suit is stored only once).
+   */
+  recordRevealedCards(
+    participants: Array<{ id: string; shownCards: Card[] }>,
+    round: number,
+  ): void {
+    const s = this.state;
+    for (const observer of participants) {
+      if (!s.revealedCards[observer.id]) s.revealedCards[observer.id] = {};
+      for (const target of participants) {
+        if (target.id === observer.id) continue;
+        const existing = s.revealedCards[observer.id][target.id]
+          ?? { cards: [], rounds: [] };
+        const seenKeys = new Set(existing.cards.map((c) => `${c.rank}-${c.suit}`));
+        const merged = [...existing.cards];
+        for (const card of target.shownCards) {
+          const key = `${card.rank}-${card.suit}`;
+          if (!seenKeys.has(key)) { merged.push(card); seenKeys.add(key); }
+        }
+        const rounds = existing.rounds.includes(round)
+          ? existing.rounds
+          : [...existing.rounds, round];
+        s.revealedCards[observer.id][target.id] = { cards: merged, rounds };
+      }
+    }
+  }
+
+  /** Return what observer has seen of target this orbit (empty if nothing stored). */
+  getRevealedCards(
+    observerId: string,
+    targetId: string,
+  ): { cards: Card[]; rounds: number[] } {
+    return this.state.revealedCards[observerId]?.[targetId] ?? { cards: [], rounds: [] };
   }
 
   /** First remaining OUT player (choice === 'out') in clockwise order from orbit starter */

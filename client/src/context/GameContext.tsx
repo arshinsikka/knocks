@@ -80,6 +80,11 @@ export interface GameResult {
 
 export type PlayerAction = 'in' | 'out' | 'join' | 'pass';
 
+export interface RevealedCardEntry {
+  cards:  Card[];
+  rounds: number[];
+}
+
 export interface GameState {
   gamePhase:      'LOBBY' | 'PLAYING' | 'GAME_OVER';
   orbit:          number;
@@ -101,15 +106,20 @@ export interface GameState {
   serverPhase:  string;
   playerChoices: Record<string, PlayerAction>;  // playerName → latest action
   log:          string[];
+  // Card memory: IDs of opponents whose cards I've seen in a showdown this orbit
+  seenPlayerIds:     string[];
+  // Cache of fetched revealed cards from server: targetPlayerId → entry
+  revealedCardCache: Record<string, RevealedCardEntry>;
 }
 
 interface GameContextValue extends GameState {
-  emitIn:          () => void;
-  emitOut:         () => void;
-  emitJoin:        () => void;
-  emitPass:        () => void;
-  dismissShowdown: () => void;
-  dismissKnock:    () => void;
+  emitIn:               () => void;
+  emitOut:              () => void;
+  emitJoin:             () => void;
+  emitPass:             () => void;
+  dismissShowdown:      () => void;
+  dismissKnock:         () => void;
+  requestRevealedCards: (targetPlayerId: string) => void;
 }
 
 const DEFAULT: GameState = {
@@ -133,6 +143,8 @@ const DEFAULT: GameState = {
   serverPhase:   'LOBBY',
   playerChoices: {},
   log:           [],
+  seenPlayerIds:     [],
+  revealedCardCache: {},
 };
 
 const GameContext = createContext<GameContextValue>({
@@ -140,6 +152,7 @@ const GameContext = createContext<GameContextValue>({
   emitIn:  () => {}, emitOut:  () => {},
   emitJoin: () => {}, emitPass: () => {},
   dismissShowdown: () => {}, dismissKnock: () => {},
+  requestRevealedCards: () => {},
 });
 
 export function GameProvider({
@@ -216,11 +229,25 @@ export function GameProvider({
     const onShowdownReveal = (d: {
       round: number; participants: ShowdownParticipant[];
       winner: string | null; payout: number; eachPayerPays: number; tie?: boolean;
-    }) => patch({
-      isMyTurn: false, turnPhase: null,
-      showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
-      serverPhase: 'SHOWDOWN',
-    });
+    }) => {
+      // Track which opponents I saw cards for so the eye icon can activate
+      setState((prev) => {
+        const myName = prev.players.find((p) => p.id === prev.myId)?.name;
+        const newSeenIds = new Set(prev.seenPlayerIds);
+        for (const participant of d.participants) {
+          if (participant.name === myName) continue;
+          const found = prev.players.find((p) => p.name === participant.name);
+          if (found) newSeenIds.add(found.id);
+        }
+        return {
+          ...prev,
+          isMyTurn: false, turnPhase: null,
+          showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
+          serverPhase: 'SHOWDOWN',
+          seenPlayerIds: [...newSeenIds],
+        };
+      });
+    };
 
     const onShowdownPublic = (d: {
       participantNames: string[]; winnerName: string | null;
@@ -249,8 +276,30 @@ export function GameProvider({
       patch({ players: d.players });
 
     const onRoundEnded = (d: { nextRound: number; nextOrbit: number; isNewOrbit: boolean }) => {
-      patch({ serverPhase: 'ROUND_END' });
-      if (d.isNewOrbit) addLog(`New orbit ${d.nextOrbit}`);
+      setState((prev) => ({
+        ...prev,
+        serverPhase: 'ROUND_END',
+        // Reset card memory on new orbit (new deck = old cards irrelevant)
+        ...(d.isNewOrbit ? { seenPlayerIds: [], revealedCardCache: {} } : {}),
+        log: d.isNewOrbit
+          ? [...prev.log.slice(-49), `New orbit ${d.nextOrbit}`]
+          : prev.log,
+      }));
+    };
+
+    const onRevealedCardsData = (d: {
+      targetPlayerId: string;
+      targetPlayerName: string;
+      cards: Card[];
+      rounds: number[];
+    }) => {
+      setState((prev) => ({
+        ...prev,
+        revealedCardCache: {
+          ...prev.revealedCardCache,
+          [d.targetPlayerId]: { cards: d.cards, rounds: d.rounds },
+        },
+      }));
     };
 
     const onGameOver = (d: GameOverData) => {
@@ -278,36 +327,38 @@ export function GameProvider({
       ...(d.myId !== undefined ? { myId: d.myId } : {}),
     });
 
-    socket.on('round_started',   onRoundStarted);
-    socket.on('cards_dealt',     onCardsDealt);
-    socket.on('your_turn',       onYourTurn);
-    socket.on('waiting_for',     onWaitingFor);
-    socket.on('player_acted',    onPlayerActed);
-    socket.on('showdown_reveal', onShowdownReveal);
-    socket.on('showdown_public', onShowdownPublic);
-    socket.on('knock_awarded',   onKnockAwarded);
-    socket.on('balance_update',  onBalanceUpdate);
-    socket.on('round_ended',     onRoundEnded);
-    socket.on('game_over',       onGameOver);
-    socket.on('state_snapshot',  onStateSnapshot);
+    socket.on('round_started',      onRoundStarted);
+    socket.on('cards_dealt',        onCardsDealt);
+    socket.on('your_turn',          onYourTurn);
+    socket.on('waiting_for',        onWaitingFor);
+    socket.on('player_acted',       onPlayerActed);
+    socket.on('showdown_reveal',    onShowdownReveal);
+    socket.on('showdown_public',    onShowdownPublic);
+    socket.on('knock_awarded',      onKnockAwarded);
+    socket.on('balance_update',     onBalanceUpdate);
+    socket.on('round_ended',        onRoundEnded);
+    socket.on('game_over',          onGameOver);
+    socket.on('state_snapshot',     onStateSnapshot);
+    socket.on('revealed_cards_data', onRevealedCardsData);
 
     // Restore full game state (including turn info) now that all listeners are registered.
     // This covers both fresh game-starts and page refreshes mid-game.
     socket.emit('request_state', { roomCode });
 
     return () => {
-      socket.off('round_started',   onRoundStarted);
-      socket.off('cards_dealt',     onCardsDealt);
-      socket.off('your_turn',       onYourTurn);
-      socket.off('waiting_for',     onWaitingFor);
-      socket.off('player_acted',    onPlayerActed);
-      socket.off('showdown_reveal', onShowdownReveal);
-      socket.off('showdown_public', onShowdownPublic);
-      socket.off('knock_awarded',   onKnockAwarded);
-      socket.off('balance_update',  onBalanceUpdate);
-      socket.off('round_ended',     onRoundEnded);
-      socket.off('game_over',       onGameOver);
-      socket.off('state_snapshot',  onStateSnapshot);
+      socket.off('round_started',      onRoundStarted);
+      socket.off('cards_dealt',        onCardsDealt);
+      socket.off('your_turn',          onYourTurn);
+      socket.off('waiting_for',        onWaitingFor);
+      socket.off('player_acted',       onPlayerActed);
+      socket.off('showdown_reveal',    onShowdownReveal);
+      socket.off('showdown_public',    onShowdownPublic);
+      socket.off('knock_awarded',      onKnockAwarded);
+      socket.off('balance_update',     onBalanceUpdate);
+      socket.off('round_ended',        onRoundEnded);
+      socket.off('game_over',          onGameOver);
+      socket.off('state_snapshot',     onStateSnapshot);
+      socket.off('revealed_cards_data', onRevealedCardsData);
     };
   }, [patch, addLog, roomCode]);
 
@@ -320,6 +371,9 @@ export function GameProvider({
       emitPass: useCallback(() => { console.log('[GameContext] emit action_pass'); getSocket().emit('action_pass'); patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
       dismissShowdown: useCallback(() => patch({ showdownData: null }), [patch]),
       dismissKnock:    useCallback(() => patch({ latestKnock: null }),   [patch]),
+      requestRevealedCards: useCallback((targetPlayerId: string) => {
+        getSocket().emit('request_revealed_cards', { targetPlayerId });
+      }, []),
     }}>
       {children}
     </GameContext.Provider>

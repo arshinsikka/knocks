@@ -15,37 +15,136 @@ import GameOverScreen from '@/components/GameOverScreen';
 import ReconnectBanner from '@/components/ReconnectBanner';
 import LedgerPanel    from '@/components/LedgerPanel';
 import { sounds } from '@/lib/sounds';
-import { GameResult } from '@/context/GameContext';
+import { GameResult, RevealedCardEntry } from '@/context/GameContext';
+import CardComponent from '@/components/Card';
+
+// ── Eye Popup ─────────────────────────────────────────────────────────────────
+
+function EyePopup({
+  playerName, entry, onClose,
+}: {
+  playerName: string;
+  entry: RevealedCardEntry;
+  onClose: () => void;
+}) {
+  const roundLabel = entry.rounds.length === 0
+    ? 'Unknown round'
+    : entry.rounds.length === 1
+      ? `Round ${entry.rounds[0]} showdown`
+      : `Rounds ${entry.rounds.join(', ')} showdowns`;
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute', top: 'calc(100% + 8px)', left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#111', border: '1px solid #2a2a2a',
+        borderRadius: 8, padding: '10px 12px',
+        zIndex: 50, minWidth: 160, maxWidth: 280,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <div style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.12em',
+        textTransform: 'uppercase', color: '#ffffff', marginBottom: 2,
+      }}>
+        {playerName.length > 12 ? playerName.slice(0, 11) + '\u2026' : playerName}&rsquo;s cards
+      </div>
+      <div style={{
+        fontSize: 9, color: '#555', letterSpacing: '0.06em', marginBottom: 8,
+      }}>
+        {roundLabel}
+      </div>
+      {entry.cards.length === 0 ? (
+        <div style={{ fontSize: 10, color: '#555' }}>No cards recorded</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {entry.cards.map((c, i) => (
+            <CardComponent key={i} card={c} mini />
+          ))}
+        </div>
+      )}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: 6, right: 8,
+          background: 'none', border: 'none', color: '#555',
+          fontSize: 12, cursor: 'pointer', lineHeight: 1, padding: 0,
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
 
 // ── Player Ring ───────────────────────────────────────────────────────────────
 
 function PlayerRing() {
-  const { players, myId, knockTarget, waitingFor, playerChoices } = useGame();
+  const {
+    players, myId, knockTarget, waitingFor, playerChoices,
+    seenPlayerIds, revealedCardCache, requestRevealedCards,
+  } = useGame();
+
+  const [eyePlayerId, setEyePlayerId] = useState<string | null>(null);
 
   const me        = players.find((p) => p.id === myId);
   const opponents = players.filter((p) => p.id !== myId);
 
+  const handleEyeClick = (playerId: string) => {
+    if (eyePlayerId === playerId) { setEyePlayerId(null); return; }
+    // Fetch from server if not cached yet
+    if (!revealedCardCache[playerId]) requestRevealedCards(playerId);
+    setEyePlayerId(playerId);
+  };
+
+  // Close popup when seenPlayerIds resets (new orbit)
+  const prevSeenLen = useRef(seenPlayerIds.length);
+  useEffect(() => {
+    if (seenPlayerIds.length < prevSeenLen.current) setEyePlayerId(null);
+    prevSeenLen.current = seenPlayerIds.length;
+  }, [seenPlayerIds.length]);
+
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      justifyContent: 'center', alignItems: 'center',
-      padding: '12px', gap: 24, overflow: 'hidden',
-    }}>
+    <div
+      style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center',
+        padding: '12px', gap: 24, overflow: 'hidden',
+      }}
+      onClick={() => setEyePlayerId(null)}
+    >
       {/* Opponents */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 8,
         justifyContent: 'center', alignContent: 'center',
       }}>
-        {opponents.map((p) => (
-          <PlayerSlot
-            key={p.id}
-            player={p}
-            knockTarget={knockTarget}
-            isMe={false}
-            isActiveTurn={waitingFor?.playerName === p.name}
-            choice={playerChoices[p.name]}
-          />
-        ))}
+        {opponents.map((p) => {
+          const hasSeen = seenPlayerIds.includes(p.id);
+          const cachedEntry = revealedCardCache[p.id];
+          return (
+            <div key={p.id} style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+              <PlayerSlot
+                player={p}
+                knockTarget={knockTarget}
+                isMe={false}
+                isActiveTurn={waitingFor?.playerName === p.name}
+                choice={playerChoices[p.name]}
+                hasSeenCards={hasSeen}
+                onEyeClick={() => handleEyeClick(p.id)}
+              />
+              {eyePlayerId === p.id && (
+                <EyePopup
+                  playerName={p.name}
+                  entry={cachedEntry ?? { cards: [], rounds: [] }}
+                  onClose={() => setEyePlayerId(null)}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* My slot */}
