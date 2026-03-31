@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getSocket } from '@/lib/socket';
 
 type View = 'main' | 'create' | 'join';
@@ -191,15 +192,26 @@ export default function Home() {
 
         {/* ── MAIN view ── */}
         {view === 'main' && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Btn
-              label="Create Room" primary
-              onClick={() => { if (!guard()) return; setError(''); setView('create'); }}
-            />
-            <Btn
-              label="Join Room"
-              onClick={() => { if (!guard()) return; setError(''); setView('join'); }}
-            />
+          <div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Btn
+                label="Create Room" primary
+                onClick={() => { if (!guard()) return; setError(''); setView('create'); }}
+              />
+              <Btn
+                label="Join Room"
+                onClick={() => { if (!guard()) return; setError(''); setView('join'); }}
+              />
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 20 }}>
+              <Link href="/rules" style={{
+                fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase',
+                color: '#666', textDecoration: 'underline',
+                fontFamily: 'var(--font-outfit), sans-serif',
+              }}>
+                Rules
+              </Link>
+            </div>
           </div>
         )}
 
