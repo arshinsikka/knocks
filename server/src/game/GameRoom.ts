@@ -327,7 +327,7 @@ export class GameRoom {
    * Cards are merged across rounds (same card by rank+suit is stored only once).
    */
   recordRevealedCards(
-    participants: Array<{ id: string; shownCards: Card[] }>,
+    participants: Array<{ id: string; name: string; shownCards: Card[] }>,
     round: number,
   ): void {
     const s = this.state;
@@ -347,6 +347,11 @@ export class GameRoom {
           ? existing.rounds
           : [...existing.rounds, round];
         s.revealedCards[observer.id][target.id] = { cards: merged, rounds };
+        console.log(
+          `[CARD MEMORY] Storing ${merged.length} card(s) of ${target.name}` +
+          ` seen by ${observer.name} in round ${round}` +
+          ` (rounds so far: ${rounds.join(', ')})`,
+        );
       }
     }
   }

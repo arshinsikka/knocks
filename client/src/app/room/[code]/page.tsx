@@ -85,7 +85,7 @@ function EyePopup({
 function PlayerRing() {
   const {
     players, myId, knockTarget, waitingFor, playerChoices,
-    seenPlayerIds, revealedCardCache, requestRevealedCards,
+    orbit, revealedCardCache, requestRevealedCards,
   } = useGame();
 
   const [eyePlayerId, setEyePlayerId] = useState<string | null>(null);
@@ -93,19 +93,24 @@ function PlayerRing() {
   const me        = players.find((p) => p.id === myId);
   const opponents = players.filter((p) => p.id !== myId);
 
-  const handleEyeClick = (playerId: string) => {
+  const handleEyeClick = (playerId: string, playerName: string) => {
     if (eyePlayerId === playerId) { setEyePlayerId(null); return; }
-    // Fetch from server if not cached yet
-    if (!revealedCardCache[playerId]) requestRevealedCards(playerId);
+    const cached = revealedCardCache[playerId];
+    console.log(
+      `[eye] tapped for ${playerName} (${playerId})` +
+      ` — cached: ${cached ? `${cached.cards.length} card(s), rounds [${cached.rounds.join(', ')}]` : 'none'}`,
+    );
+    // Request from server as a fallback (e.g. after reconnect when client cache is empty)
+    if (!cached) requestRevealedCards(playerId);
     setEyePlayerId(playerId);
   };
 
-  // Close popup when seenPlayerIds resets (new orbit)
-  const prevSeenLen = useRef(seenPlayerIds.length);
+  // Close popup when a new orbit starts (cache resets)
+  const prevOrbitRef = useRef(orbit);
   useEffect(() => {
-    if (seenPlayerIds.length < prevSeenLen.current) setEyePlayerId(null);
-    prevSeenLen.current = seenPlayerIds.length;
-  }, [seenPlayerIds.length]);
+    if (orbit !== prevOrbitRef.current) setEyePlayerId(null);
+    prevOrbitRef.current = orbit;
+  }, [orbit]);
 
   return (
     <div
@@ -122,8 +127,9 @@ function PlayerRing() {
         justifyContent: 'center', alignContent: 'center',
       }}>
         {opponents.map((p) => {
-          const hasSeen = seenPlayerIds.includes(p.id);
           const cachedEntry = revealedCardCache[p.id];
+          // Eye icon is only active when we actually have cards stored for this player
+          const hasSeen = (cachedEntry?.cards.length ?? 0) > 0;
           return (
             <div key={p.id} style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
               <PlayerSlot
@@ -133,7 +139,7 @@ function PlayerRing() {
                 isActiveTurn={waitingFor?.playerName === p.name}
                 choice={playerChoices[p.name]}
                 hasSeenCards={hasSeen}
-                onEyeClick={() => handleEyeClick(p.id)}
+                onEyeClick={() => handleEyeClick(p.id, p.name)}
               />
               {eyePlayerId === p.id && (
                 <EyePopup

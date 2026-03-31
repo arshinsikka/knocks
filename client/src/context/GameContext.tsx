@@ -230,21 +230,47 @@ export function GameProvider({
       round: number; participants: ShowdownParticipant[];
       winner: string | null; payout: number; eachPayerPays: number; tie?: boolean;
     }) => {
-      // Track which opponents I saw cards for so the eye icon can activate
+      // Store revealed cards directly from the event — no server round-trip needed.
+      // The showdown_reveal already contains exactly the cards each opponent showed.
       setState((prev) => {
         const myName = prev.players.find((p) => p.id === prev.myId)?.name;
         const newSeenIds = new Set(prev.seenPlayerIds);
+        const newCache: Record<string, RevealedCardEntry> = { ...prev.revealedCardCache };
+
         for (const participant of d.participants) {
           if (participant.name === myName) continue;
           const found = prev.players.find((p) => p.name === participant.name);
-          if (found) newSeenIds.add(found.id);
+          if (!found) continue;
+
+          newSeenIds.add(found.id);
+
+          // Merge this showdown's cards into the cache, deduplicating by rank+suit
+          if (participant.cards.length > 0) {
+            const existing = newCache[found.id] ?? { cards: [], rounds: [] };
+            const seenKeys = new Set(existing.cards.map((c) => `${c.rank}-${c.suit}`));
+            const merged = [...existing.cards];
+            for (const card of participant.cards) {
+              const key = `${card.rank}-${card.suit}`;
+              if (!seenKeys.has(key)) { merged.push(card); seenKeys.add(key); }
+            }
+            const rounds = existing.rounds.includes(d.round)
+              ? existing.rounds
+              : [...existing.rounds, d.round];
+            newCache[found.id] = { cards: merged, rounds };
+            console.log(
+              `[card memory] stored ${merged.length} card(s) for ${participant.name}` +
+              ` (round ${d.round}, rounds so far: ${rounds.join(', ')})`,
+            );
+          }
         }
+
         return {
           ...prev,
           isMyTurn: false, turnPhase: null,
           showdownData: { ...d, tie: d.tie ?? false, isPublic: false },
           serverPhase: 'SHOWDOWN',
           seenPlayerIds: Array.from(newSeenIds),
+          revealedCardCache: newCache,
         };
       });
     };
@@ -293,6 +319,10 @@ export function GameProvider({
       cards: Card[];
       rounds: number[];
     }) => {
+      console.log(
+        `[card memory] server response for ${d.targetPlayerName}:` +
+        ` ${d.cards.length} card(s), rounds [${d.rounds.join(', ')}]`,
+      );
       setState((prev) => ({
         ...prev,
         revealedCardCache: {

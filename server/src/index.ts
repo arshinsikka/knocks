@@ -279,6 +279,7 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
     game.recordRevealedCards(
       participants.map((pp) => ({
         id: pp.id,
+        name: pp.name,
         shownCards: getShowdownCardData(pp, s.round).cards,
       })),
       s.round,
@@ -774,12 +775,22 @@ io.on('connection', (socket: Socket) => {
   // Server verifies they actually saw those cards before responding.
   socket.on('request_revealed_cards', ({ targetPlayerId }: { targetPlayerId: string }) => {
     const found = findGameBySocket(socket.id);
-    if (!found) return;
+    if (!found) {
+      console.log(`[CARD MEMORY REQUEST] socket=${socket.id} not found in any game`);
+      return;
+    }
     const [, game, observer] = found;
     const s = game.getState();
     const target = s.players.find((p) => p.id === targetPlayerId);
-    if (!target) return;
+    if (!target) {
+      console.log(`[CARD MEMORY REQUEST] targetPlayerId=${targetPlayerId} not found`);
+      return;
+    }
     const { cards, rounds } = game.getRevealedCards(observer.id, targetPlayerId);
+    console.log(
+      `[CARD MEMORY REQUEST] ${observer.name} asking for ${target.name}'s cards` +
+      ` — found: ${cards.length} card(s) in rounds [${rounds.join(', ')}]`,
+    );
     socket.emit('revealed_cards_data', {
       targetPlayerId,
       targetPlayerName: target.name,
