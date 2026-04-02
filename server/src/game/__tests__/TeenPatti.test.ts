@@ -266,3 +266,57 @@ describe('compareHands — muflis mode', () => {
     expect(compareHands(a23, akq, 'muflis')).toBe(1);
   });
 });
+
+// ── muflis head-to-head comparisons (BUG 2) ──────────────────────────────────
+describe('compareHands — muflis head-to-head edge cases', () => {
+  test('2-3-5 offsuit beats Trail (worst muflis hand)', () => {
+    const hand235 = classifyHand([c(2, S), c(3, H), c(5, D)]);
+    const trail = classifyHand([c(14, S), c(14, H), c(14, D)]); // worst trail
+    expect(compareHands(hand235, trail, 'muflis')).toBe(1);
+  });
+
+  test('2-3-5 offsuit beats Pure Sequence', () => {
+    const hand235 = classifyHand([c(2, S), c(3, H), c(5, D)]);
+    const ps = classifyHand([c(4, S), c(3, S), c(2, S)]);
+    expect(compareHands(hand235, ps, 'muflis')).toBe(1);
+  });
+
+  test('2-3-5 offsuit beats any High Card (even lower-value high card)', () => {
+    const hand235 = classifyHand([c(2, S), c(3, H), c(5, D)]);
+    // 2-3-4 would normally beat 2-3-5 on values alone (lower), but 2-3-5 has special rule
+    const hand234 = classifyHand([c(2, H), c(3, D), c(4, C)]);
+    expect(compareHands(hand235, hand234, 'muflis')).toBe(1);
+  });
+
+  test('High Card 7-4-2 beats Pair of 2s in muflis', () => {
+    const hc = classifyHand([c(7, S), c(4, H), c(2, D)]);
+    const pair = classifyHand([c(2, S), c(2, H), c(14, D)]);
+    expect(compareHands(hc, pair, 'muflis')).toBe(1);
+  });
+
+  test('Pair of 3s beats Sequence 4-5-6 in muflis', () => {
+    const pair = classifyHand([c(3, S), c(3, H), c(14, D)]);
+    const seq = classifyHand([c(4, S), c(5, H), c(6, D)]);
+    expect(compareHands(pair, seq, 'muflis')).toBe(1);
+  });
+
+  test('Pair of 2s beats Pair of Aces in muflis (lower pair rank wins)', () => {
+    const twos = classifyHand([c(2, S), c(2, H), c(14, D)]);
+    const aces = classifyHand([c(14, S), c(14, H), c(2, D)]);
+    expect(compareHands(twos, aces, 'muflis')).toBe(1);
+  });
+
+  test('High Card 5-3-2 beats High Card 5-4-2 in muflis (lower second card wins)', () => {
+    const a = classifyHand([c(5, S), c(3, H), c(2, D)]);
+    const b = classifyHand([c(5, H), c(4, D), c(2, C)]);
+    expect(compareHands(a, b, 'muflis')).toBe(1);
+  });
+
+  test('A-2-3 is correctly identified as Sequence (not High Card) in muflis context', () => {
+    const a23 = classifyHand([c(14, S), c(2, H), c(3, D)]);
+    expect(a23.type).toBe('sequence');
+    // In muflis, high_card beats sequence — A-2-3 should lose to any high card
+    const hc = classifyHand([c(13, S), c(11, H), c(9, D)]);
+    expect(compareHands(hc, a23, 'muflis')).toBe(1);
+  });
+});

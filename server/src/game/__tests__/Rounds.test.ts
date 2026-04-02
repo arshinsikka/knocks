@@ -196,3 +196,152 @@ describe('getBestHand — round 5 (normal best)', () => {
     expect(hand.type).toBe('pure_sequence');
   });
 });
+
+// ── Round 3 joker suit precision (BUG 1) ─────────────────────────────────────
+describe('getBestHand — round 3 joker suit precision', () => {
+  // Each test: 2 real cards of same color + 1 odd-color joker card.
+  // The joker's actual rank/suit are irrelevant; we verify the best sub is chosen.
+
+  test('[AH, QH, joker=2S] → Pure Sequence A-K-Q hearts (not impure sequence)', () => {
+    // 2R+1B: 2♠ is joker, realCards=[A♥, Q♥]
+    const cards = [c(14, 'hearts'), c(12, 'hearts'), c(2, 'spades')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.values[0]).toBe(12); // A-K-Q sequence rank
+    expect(hand.cards.every((card) => card.suit === 'hearts')).toBe(true);
+  });
+
+  test('[7S, 8S, joker=2H] → Pure Sequence 7-8-9 spades (not impure, not 6-7-8)', () => {
+    // 2B+1R: 2♥ is joker, realCards=[7♠, 8♠]
+    const cards = [c(7, 'spades'), c(8, 'spades'), c(2, 'hearts')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.cards.every((card) => card.suit === 'spades')).toBe(true);
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([7, 8, 9]); // NOT [6,7,8] (lower) and not 9 of another suit
+  });
+
+  test('[AC, KC, joker=2H] → Pure Sequence A-K-Q clubs', () => {
+    // 2B+1R: 2♥ is joker, realCards=[A♣, K♣]
+    const cards = [c(14, 'clubs'), c(13, 'clubs'), c(2, 'hearts')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.values[0]).toBe(12);
+    expect(hand.cards.every((card) => card.suit === 'clubs')).toBe(true);
+  });
+
+  test('[5H, 5D, joker=2S] → Trail of 5s (best possible)', () => {
+    // 2R+1B: 2♠ is joker, realCards=[5♥, 5♦]
+    const cards = [c(5, 'hearts'), c(5, 'diamonds'), c(2, 'spades')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('trail');
+    expect(hand.values[0]).toBe(5);
+  });
+
+  test('[4D, 6D, joker=2S] → Pure Sequence 4-5-6 diamonds (not 5 of another suit)', () => {
+    // 2R+1B: 2♠ is joker, realCards=[4♦, 6♦]
+    const cards = [c(4, 'diamonds'), c(6, 'diamonds'), c(2, 'spades')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.cards.every((card) => card.suit === 'diamonds')).toBe(true);
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([4, 5, 6]);
+  });
+
+  test('[AH, 2H, joker=3S] → Pure Sequence A-2-3 hearts (not impure A-2-3)', () => {
+    // 2R+1B: 3♠ is joker, realCards=[A♥, 2♥]
+    const cards = [c(14, 'hearts'), c(2, 'hearts'), c(3, 'spades')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.values[0]).toBe(11); // A-2-3 sequence rank = 11
+    expect(hand.cards.every((card) => card.suit === 'hearts')).toBe(true);
+  });
+});
+
+// ── Round 4 muflis subset selection (BUG 2) ──────────────────────────────────
+describe('getBestHand — round 4 muflis subset selection', () => {
+  test('[2S,3H,5C,AD] → picks [2S,3H,5C] = 2-3-5 offsuit (special best)', () => {
+    const cards = [c(2, 'spades'), c(3, 'hearts'), c(5, 'clubs'), c(14, 'diamonds')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    // 2-3-5 offsuit is classified as high_card with those ranks
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 5]);
+    // Must be offsuit (not all same suit) — classifyHand returns high_card only for non-flush
+    const suits = new Set(hand.cards.map((card) => card.suit));
+    expect(suits.size).toBeGreaterThan(1);
+  });
+
+  test('[2S,3S,5S,7H] → does NOT pick 2-3-5 same suit (color); picks lowest high card', () => {
+    // [2♠,3♠,5♠] = color (bad in muflis); should pick [2♠,3♠,7♥] = high_card{7,3,2}
+    const cards = [c(2, 'spades'), c(3, 'spades'), c(5, 'spades'), c(7, 'hearts')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 7]);
+  });
+
+  test('[AS,AH,2D,3C] → picks pair of aces with kicker 2 (NOT kicker 3, NOT A-2-3 sequence)', () => {
+    const cards = [c(14, 'spades'), c(14, 'hearts'), c(2, 'diamonds'), c(3, 'clubs')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pair');
+    expect(hand.values[0]).toBe(14); // pair of aces
+    expect(hand.values[1]).toBe(2);  // kicker 2, NOT 3
+  });
+
+  test('[AS,2H,3D,7C] → does NOT pick A-2-3 sequence; picks [2H,3D,7C] high card', () => {
+    // A-2-3 is a Sequence (bad in muflis). [2H,3D,7C] = high_card with lowest values.
+    const cards = [c(14, 'spades'), c(2, 'hearts'), c(3, 'diamonds'), c(7, 'clubs')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 7]);
+  });
+
+  test('[AS,2H,3D,5C] → picks [2H,3D,5C] = 2-3-5 offsuit, NOT A-2-3 sequence', () => {
+    const cards = [c(14, 'spades'), c(2, 'hearts'), c(3, 'diamonds'), c(5, 'clubs')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 5]);
+    const suits = new Set(hand.cards.map((card) => card.suit));
+    expect(suits.size).toBeGreaterThan(1);
+  });
+
+  test('[4C,4H,4S,7D] → does NOT pick trail; picks pair of 4s (better muflis)', () => {
+    const cards = [c(4, 'clubs'), c(4, 'hearts'), c(4, 'spades'), c(7, 'diamonds')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pair');
+    expect(hand.values[0]).toBe(4); // pair of 4s
+  });
+
+  test('[KS,QH,AD,2C] → avoids A-K-Q (highest sequence); picks high card subset', () => {
+    // A-K-Q is a sequence — bad in muflis. Best is a high-card subset like K-Q-2.
+    const cards = [c(13, 'spades'), c(12, 'hearts'), c(14, 'diamonds'), c(2, 'clubs')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    // Should not contain A,K,Q together (that's a sequence)
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).not.toEqual([12, 13, 14]);
+  });
+
+  test('[2C,3D,4S,5H] → picks [2C,3D,5H] = 2-3-5 offsuit (avoids sequences 2-3-4 and 3-4-5)', () => {
+    const cards = [c(2, 'clubs'), c(3, 'diamonds'), c(4, 'spades'), c(5, 'hearts')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 5]); // 2-3-5 offsuit
+    const suits = new Set(hand.cards.map((card) => card.suit));
+    expect(suits.size).toBeGreaterThan(1);
+  });
+
+  test('[2S,3H,5C,5D] → picks [2S,3H,5C] = 2-3-5 offsuit even though pair of 5s exists', () => {
+    const cards = [c(2, 'spades'), c(3, 'hearts'), c(5, 'clubs'), c(5, 'diamonds')];
+    const hand = getBestHand(cards, 4, cards) as ClassifiedHand;
+    expect(hand.type).toBe('high_card');
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([2, 3, 5]);
+    const suits = new Set(hand.cards.map((card) => card.suit));
+    expect(suits.size).toBeGreaterThan(1);
+  });
+});
