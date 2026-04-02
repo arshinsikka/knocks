@@ -28,15 +28,13 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
   const highlightActive = round >= 4 && selectedCards.length > 0 && selectedCards.length < count;
   const selectedSet = new Set(selectedCards.map(cardKey));
 
-  // Round 3 joker substitution: find which original card is the joker and what it became
+  // Round 3 joker: find which original dealt card is the wild card
   const r3JokerSub = (() => {
     if (round !== 3 || selectedCards.length !== count || count === 0) return null;
     const selKeys = new Set(selectedCards.map(cardKey));
-    const rawKeys = new Set(cards.map(cardKey));
     const jokerOrig = cards.find((c) => !selKeys.has(cardKey(c)));
-    const subCard   = selectedCards.find((c) => !rawKeys.has(cardKey(c)));
-    if (!jokerOrig || !subCard) return null;
-    return { jokerKey: cardKey(jokerOrig), subCard };
+    if (!jokerOrig) return null;
+    return { jokerKey: cardKey(jokerOrig) };
   })();
 
   // Play deal sound for each newly arrived card with slight stagger + pitch variation
@@ -88,7 +86,6 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
             {cards.map((card, i) => {
               const isSelected = !highlightActive || selectedSet.has(cardKey(card));
               const isJoker = r3JokerSub?.jokerKey === cardKey(card);
-              const displayCard = isJoker ? r3JokerSub!.subCard : card;
               return (
                 <div
                   key={i}
@@ -104,16 +101,16 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
                     position: 'relative',
                   }}
                 >
-                  <Card card={displayCard} totalCards={count} index={i} />
+                  <Card card={card} totalCards={count} index={i} />
                   {isJoker && (
                     <div style={{
-                      position: 'absolute', top: -8, left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: 'var(--border-bright)',
-                      color: 'var(--bg-primary)',
-                      fontSize: 7, fontWeight: 700, letterSpacing: '0.05em',
-                      padding: '1px 4px', borderRadius: 2,
+                      position: 'absolute', top: 2, right: 2,
+                      background: 'rgba(0,0,0,0.7)',
+                      color: '#fff',
+                      fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                      padding: '1px 3px', borderRadius: 3,
                       whiteSpace: 'nowrap',
+                      lineHeight: 1,
                     }}>
                       WILD
                     </div>

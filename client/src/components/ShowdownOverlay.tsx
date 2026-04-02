@@ -63,13 +63,13 @@ function CardRow({ p, round }: { p: ShowdownParticipant; round: number }) {
               <Card card={c} totalCards={p.cards.length} mini />
               {isJoker && (
                 <div style={{
-                  position: 'absolute', top: -8, left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'var(--border-bright)',
-                  color: 'var(--bg-primary)',
-                  fontSize: 7, fontWeight: 700, letterSpacing: '0.05em',
-                  padding: '1px 4px', borderRadius: 2,
+                  position: 'absolute', top: 2, right: 2,
+                  background: 'rgba(0,0,0,0.7)',
+                  color: '#fff',
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                  padding: '1px 3px', borderRadius: 3,
                   whiteSpace: 'nowrap',
+                  lineHeight: 1,
                 }}>
                   WILD
                 </div>
@@ -88,15 +88,7 @@ function CardRow({ p, round }: { p: ShowdownParticipant; round: number }) {
           Imagined: {cardLabel(p.imaginedCard)}
         </div>
       )}
-      {round === 3 && p.jokerTriggered && p.jokerBecame && (
-        <div style={{
-          marginTop: 5, fontSize: 10, color: 'var(--text-muted)',
-          letterSpacing: '0.06em',
-        }}>
-          → {cardLabel(p.jokerBecame)}
-        </div>
-      )}
-      {ROUND_HAND_LABEL[round] && (
+{ROUND_HAND_LABEL[round] && (
         <div style={{
           marginTop: 4, fontSize: 9, letterSpacing: '0.12em',
           textTransform: 'uppercase', color: 'var(--text-muted)',
