@@ -28,6 +28,17 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
   const highlightActive = round >= 4 && selectedCards.length > 0 && selectedCards.length < count;
   const selectedSet = new Set(selectedCards.map(cardKey));
 
+  // Round 3 joker substitution: find which original card is the joker and what it became
+  const r3JokerSub = (() => {
+    if (round !== 3 || selectedCards.length !== count || count === 0) return null;
+    const selKeys = new Set(selectedCards.map(cardKey));
+    const rawKeys = new Set(cards.map(cardKey));
+    const jokerOrig = cards.find((c) => !selKeys.has(cardKey(c)));
+    const subCard   = selectedCards.find((c) => !rawKeys.has(cardKey(c)));
+    if (!jokerOrig || !subCard) return null;
+    return { jokerKey: cardKey(jokerOrig), subCard };
+  })();
+
   // Play deal sound for each newly arrived card with slight stagger + pitch variation
   const prevCountRef = useRef(0);
   useEffect(() => {
@@ -76,6 +87,8 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
           }}>
             {cards.map((card, i) => {
               const isSelected = !highlightActive || selectedSet.has(cardKey(card));
+              const isJoker = r3JokerSub?.jokerKey === cardKey(card);
+              const displayCard = isJoker ? r3JokerSub!.subCard : card;
               return (
                 <div
                   key={i}
@@ -88,9 +101,23 @@ export default function HandTray({ cards, selectedCards = [], round = 1 }: Props
                       ? '0 -2px 0 0 rgba(255,255,255,0.25)'
                       : 'none',
                     borderRadius: 4,
+                    position: 'relative',
                   }}
                 >
-                  <Card card={card} totalCards={count} index={i} />
+                  <Card card={displayCard} totalCards={count} index={i} />
+                  {isJoker && (
+                    <div style={{
+                      position: 'absolute', top: -8, left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'var(--border-bright)',
+                      color: 'var(--bg-primary)',
+                      fontSize: 7, fontWeight: 700, letterSpacing: '0.05em',
+                      padding: '1px 4px', borderRadius: 2,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      WILD
+                    </div>
+                  )}
                 </div>
               );
             })}

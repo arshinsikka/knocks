@@ -256,6 +256,17 @@ describe('getBestHand — round 3 joker suit precision', () => {
     expect(hand.values[0]).toBe(11); // A-2-3 sequence rank = 11
     expect(hand.cards.every((card) => card.suit === 'hearts')).toBe(true);
   });
+
+  test('[10H, QH, joker=10C] → Pure Sequence 10-J-Q hearts (same-rank joker case)', () => {
+    // 10♥=red, Q♥=red, 10♣=black → 2R+1B → 10♣ is joker; realCards=[10♥, Q♥]
+    // J♥ gives pure_sequence; J♠/J♦/J♣ give sequence — must pick J♥
+    const cards = [c(10, 'hearts'), c(12, 'hearts'), c(10, 'clubs')];
+    const hand = getBestHand(cards, 3, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.cards.every((card) => card.suit === 'hearts')).toBe(true);
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([10, 11, 12]);
+  });
 });
 
 // ── Round 4 muflis subset selection (BUG 2) ──────────────────────────────────
