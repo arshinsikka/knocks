@@ -86,10 +86,14 @@ export function getBestHand(
     const deck = buildDeck();
     const candidates = deck.filter((c) => !dealtKeys.has(cardKey(c)));
 
-    const hands: ClassifiedHand[] = candidates.map((c) =>
-      classifyHand([playerCards[0], playerCards[1], c]),
-    );
-    return bestOf(hands, 'normal', 2);
+    let bestHand2: ClassifiedHand | null = null;
+    for (const card of candidates) {
+      const h = classifyHand([playerCards[0], playerCards[1], card]);
+      if (!bestHand2 || compareHands(h, bestHand2, 'normal', 2) === 1) {
+        bestHand2 = h;
+      }
+    }
+    return bestHand2!;
   }
 
   // ── Round 3: 3 cards, joker determined by color composition ────────────

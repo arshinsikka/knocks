@@ -197,6 +197,27 @@ describe('getBestHand — round 5 (normal best)', () => {
   });
 });
 
+// ── Round 2 imagined-card suit precision ─────────────────────────────────────
+describe('getBestHand — round 2 imagined card suit precision', () => {
+  test('[10♥, Q♥] → imagined card must be J♥ (Pure Sequence, not J♠ Sequence)', () => {
+    const cards = [c(10, 'hearts'), c(12, 'hearts')];
+    const hand = getBestHand(cards, 2, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.cards.every((card) => card.suit === 'hearts')).toBe(true);
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([10, 11, 12]);
+  });
+
+  test('[A♣, K♣] → imagined card must be Q♣ (Pure Sequence, not Q♥ Sequence)', () => {
+    const cards = [c(14, 'clubs'), c(13, 'clubs')];
+    const hand = getBestHand(cards, 2, cards) as ClassifiedHand;
+    expect(hand.type).toBe('pure_sequence');
+    expect(hand.cards.every((card) => card.suit === 'clubs')).toBe(true);
+    const ranks = hand.cards.map((card) => card.rank).sort((a, b) => a - b);
+    expect(ranks).toEqual([12, 13, 14]);
+  });
+});
+
 // ── Round 3 joker suit precision (BUG 1) ─────────────────────────────────────
 describe('getBestHand — round 3 joker suit precision', () => {
   // Each test: 2 real cards of same color + 1 odd-color joker card.
