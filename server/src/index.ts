@@ -60,9 +60,13 @@ const LOBBY_GRACE_MS  = 60_000;
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const consonants = 'BDFGHKLMNPRSTVWZ';
+  const vowels = 'AEIOU';
   let code = '';
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) {
+    const pool = i % 2 === 0 ? consonants : vowels;
+    code += pool[Math.floor(Math.random() * pool.length)];
+  }
   return code;
 }
 

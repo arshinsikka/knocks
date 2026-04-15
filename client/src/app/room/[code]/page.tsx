@@ -369,22 +369,22 @@ function LobbyView({ code, session, onLedger, hasLedger }: { code: string; sessi
     setTimeout(() => setCopied(false), 1800);
   }, [code]);
 
-  const shareLink = `https://knocks.vercel.app/join/${code}`;
+  const shareText = `Join my Knocks game! Code: ${code} — knocks.vercel.app`;
   const share = useCallback(async () => {
     try {
       if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: 'Join my Knocks game', url: shareLink });
+        await navigator.share({ title: 'Join my Knocks game', text: shareText });
       } else {
-        await navigator.clipboard.writeText(shareLink);
+        await navigator.clipboard.writeText(shareText);
         setShared(true);
-        setTimeout(() => setShared(false), 1800);
+        setTimeout(() => setShared(false), 2000);
       }
     } catch {
-      await navigator.clipboard.writeText(shareLink);
+      await navigator.clipboard.writeText(shareText);
       setShared(true);
-      setTimeout(() => setShared(false), 1800);
+      setTimeout(() => setShared(false), 2000);
     }
-  }, [shareLink]);
+  }, [shareText]);
 
   return (
     <div style={{
@@ -403,51 +403,53 @@ function LobbyView({ code, session, onLedger, hasLedger }: { code: string; sessi
           }}>
             Room Code
           </div>
-          <button
-            onClick={copy}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 10,
-            }}
-          >
-            <span className="mono" style={{
-              fontSize: 40, fontWeight: 700, letterSpacing: '0.2em',
-              color: 'var(--text-primary)',
-            }}>
-              {code}
-            </span>
-            <span style={{
-              fontSize: 16, color: copied ? 'var(--text-secondary)' : 'var(--text-muted)',
-              transition: 'color 150ms ease',
-            }}>
-              {copied ? '\u2713' : '\u2398'}
-            </span>
-          </button>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 16, marginBottom: 10,
+          }}>
+            <button
+              onClick={copy}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 12,
+              }}
+            >
+              <span className="mono" style={{
+                fontSize: 40, fontWeight: 700, letterSpacing: '0.2em',
+                color: 'var(--text-primary)',
+              }}>
+                {code}
+              </span>
+              <span style={{
+                fontSize: 16, color: copied ? 'var(--text-secondary)' : 'var(--text-muted)',
+                transition: 'color 150ms ease',
+              }}>
+                {copied ? '\u2713' : '\u2398'}
+              </span>
+            </button>
+            <button
+              onClick={share}
+              style={{
+                background: 'none',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 6,
+                padding: '6px 14px',
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 500,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: shared ? 'var(--text-secondary)' : 'var(--text-muted)',
+                transition: 'color 150ms ease, border-color 150ms ease',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {shared ? 'Copied!' : 'Share'}
+            </button>
+          </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
             Share this code with your friends
           </p>
-
-          {/* Share link button */}
-          <button
-            onClick={share}
-            style={{
-              marginTop: 10,
-              background: 'none',
-              border: '1px solid var(--border-medium)',
-              borderRadius: 6,
-              padding: '8px 20px',
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: shared ? 'var(--text-secondary)' : 'var(--text-muted)',
-              transition: 'color 150ms ease, border-color 150ms ease',
-              fontFamily: 'var(--font-outfit), sans-serif',
-            }}
-          >
-            {shared ? 'Link Copied!' : 'Share Link'}
-          </button>
         </div>
 
         {/* Room settings pill */}

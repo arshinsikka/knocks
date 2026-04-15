@@ -11,7 +11,8 @@
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(npx jest:*)",
       "Bash(xargs cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node:*)"
     ]
   }
 }
