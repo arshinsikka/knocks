@@ -54,6 +54,7 @@ export class GameRoom {
       balance: 0,
       knocks: 0,
       choice: null,
+      autoPass: false,
       totalOrbitFees: 0,
       showdownWinnings: 0,
       showdownLosses: 0,
@@ -120,10 +121,11 @@ export class GameRoom {
       s.allDealtCards.push(card);
     }
 
-    // Evaluate best hand using the full accumulated hand
+    // Evaluate best hand using the full accumulated hand; reset per-round flags
     for (const p of s.players) {
       p.bestHand = getBestHand(p.cards, s.round, s.allDealtCards);
       p.choice = null;
+      p.autoPass = false;
     }
 
     // Reset turn to orbit starter
@@ -191,6 +193,60 @@ export class GameRoom {
       s.phase = 'SHOWDOWN';
     }
     return true;
+  }
+
+  /**
+   * OUT & PASS: player opts out of both the round and the challenge window.
+   * Recorded as choice='out' with autoPass=true. The autoPass flag is private —
+   * it is never broadcast to other clients.
+   */
+  submitOutAndPass(playerId: string): boolean {
+    const s = this.state;
+    if (s.phase !== 'IN_OUT') return false;
+
+    const current = s.players[s.currentTurnIndex];
+    if (current.id !== playerId) return false;
+
+    current.choice = 'out';
+    current.autoPass = true;
+    s.currentTurnIndex = (s.currentTurnIndex + 1) % s.players.length;
+
+    const allChosen = s.players.every((p) => p.choice !== null);
+    if (allChosen) {
+      const anyIn = s.players.some((p) => p.choice === 'in');
+      if (!anyIn) {
+        // All OUT (some may be autoPass) — no challenge, no knock
+        s.phase = 'ROUND_END';
+      } else {
+        // Mix of IN and OUT — challenge phase; autoPass players handled by
+        // processAutoPassPlayers() called by the server before looking for actors
+        s.phase = 'CHALLENGE_JOIN';
+        s.currentTurnIndex = s.orbitStarterIndex;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Called by the server as soon as CHALLENGE_JOIN begins.
+   * Converts every autoPass OUT player to 'pass' silently (no events emitted).
+   * If no genuine OUT players remain, advances phase to SHOWDOWN so the server
+   * can skip the challenge window entirely.
+   */
+  processAutoPassPlayers(): void {
+    const s = this.state;
+    if (s.phase !== 'CHALLENGE_JOIN') return;
+
+    for (const p of s.players) {
+      if (p.choice === 'out' && p.autoPass) {
+        p.choice = 'pass';
+      }
+    }
+
+    const stillOut = s.players.some((p) => p.choice === 'out');
+    if (!stillOut) {
+      s.phase = 'SHOWDOWN';
+    }
   }
 
   private getOutPlayersInOrder(): GamePlayer[] {

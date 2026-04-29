@@ -98,6 +98,7 @@ export interface GamePlayer {
   balance: number;
   knocks: number;
   choice: PlayerChoice;
+  autoPass: boolean;          // set by OUT & PASS; cleared each round; never broadcast
   // Breakdown tracking for game-over screen
   totalOrbitFees: number;     // negative; -2 per orbit
   showdownWinnings: number;   // positive; peer-to-peer

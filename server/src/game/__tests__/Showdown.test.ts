@@ -5,7 +5,7 @@ import { settleShowdown, calculatePayout } from '../Pot';
 function makePlayer(id: string, cards: Card[]): GamePlayer {
   return {
     id, name: id, socketId: id,
-    cards, bestHand: null, balance: 0, knocks: 0, choice: 'in',
+    cards, bestHand: null, balance: 0, knocks: 0, choice: 'in', autoPass: false,
     totalOrbitFees: 0, showdownWinnings: 0, showdownLosses: 0, potCollected: 0,
   };
 }

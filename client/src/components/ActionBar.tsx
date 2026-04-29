@@ -8,18 +8,21 @@ import { sounds } from '@/lib/sounds';
 const TURN_SECS = 15;
 
 interface Props {
-  isMyTurn:      boolean;
-  turnPhase:     'in_out' | 'challenge_join' | null;
-  serverPhase:   string;
-  waitingFor:    { playerName: string; phase: string } | null;
-  myName:        string;
-  playerChoices: Record<string, PlayerAction>;
-  emitIn:        () => void;
-  emitOut:       () => void;
-  emitJoin:      () => void;
-  emitPass:      () => void;
+  isMyTurn:       boolean;
+  turnPhase:      'in_out' | 'challenge_join' | null;
+  serverPhase:    string;
+  waitingFor:     { playerName: string; phase: string } | null;
+  myName:         string;
+  playerChoices:  Record<string, PlayerAction>;
+  myOutAndPass:   boolean;
+  emitIn:         () => void;
+  emitOut:        () => void;
+  emitOutAndPass: () => void;
+  emitJoin:       () => void;
+  emitPass:       () => void;
 }
 
+// Standard 2-button variant
 function Btn({
   label, onClick, primary = false, disabled = false,
 }: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }) {
@@ -34,6 +37,43 @@ function Btn({
         fontSize: 15, fontWeight: 500,
         letterSpacing: '0.05em',
         textTransform: 'uppercase',
+        border: `1px solid ${primary ? 'var(--border-bright)' : 'var(--border-medium)'}`,
+        borderRadius: 8,
+        background: primary ? 'var(--border-medium)' : 'transparent',
+        color: primary ? 'var(--text-primary)' : 'var(--text-muted)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.35 : 1,
+        transition: 'background 150ms ease-out, border-color 150ms ease-out, opacity 150ms ease-out',
+        fontFamily: 'var(--font-outfit), sans-serif',
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = primary ? 'var(--border-medium)' : 'transparent';
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// Compact 3-button variant — smaller font so all three fit on 320px screens
+function CompactBtn({
+  label, onClick, primary = false, disabled = false,
+}: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="btn-tap"
+      style={{
+        flex: 1,
+        minHeight: 48,
+        fontSize: 13, fontWeight: 500,
+        letterSpacing: '0.03em',
+        textTransform: 'uppercase',
+        padding: '0 2px',
         border: `1px solid ${primary ? 'var(--border-bright)' : 'var(--border-medium)'}`,
         borderRadius: 8,
         background: primary ? 'var(--border-medium)' : 'transparent',
@@ -86,7 +126,8 @@ function Countdown({ secs }: { secs: number }) {
 
 export default function ActionBar({
   isMyTurn, turnPhase, serverPhase, waitingFor,
-  myName, playerChoices, emitIn, emitOut, emitJoin, emitPass,
+  myName, playerChoices, myOutAndPass,
+  emitIn, emitOut, emitOutAndPass, emitJoin, emitPass,
 }: Props) {
   // ── Double-click guard ────────────────────────────────────────────────────
   const [acted, setActed] = useState(false);
@@ -159,17 +200,18 @@ export default function ActionBar({
   const myChoice = playerChoices[myName];
   console.log('[ActionBar] render | isMyTurn:', isMyTurn, '| turnPhase:', turnPhase,
     '| serverPhase:', serverPhase, '| acted:', acted, '| myChoice:', myChoice,
-    '| countdown:', countdown);
+    '| myOutAndPass:', myOutAndPass, '| countdown:', countdown);
 
   // ── Content ───────────────────────────────────────────────────────────────
   let content: React.ReactNode;
 
   if (isMyTurn && turnPhase === 'in_out') {
+    // Three-button row: IN / OUT / OUT & PASS
     content = (
       <>
-        <Btn label="In"  onClick={() => act('In',  emitIn)}  primary disabled={acted} />
-        <Btn label="Out" onClick={() => act('Out', emitOut)}         disabled={acted} />
-        <Countdown secs={countdown} />
+        <CompactBtn label="IN"          onClick={() => act('In',      emitIn)}          primary disabled={acted} />
+        <CompactBtn label="OUT"         onClick={() => act('Out',     emitOut)}                  disabled={acted} />
+        <CompactBtn label="OUT & PASS"  onClick={() => act('OutPass', emitOutAndPass)}           disabled={acted} />
       </>
     );
   } else if (isMyTurn && turnPhase === 'challenge_join') {
@@ -185,7 +227,10 @@ export default function ActionBar({
       ? <WaitText>Waiting for {waitingFor.playerName}&hellip; ({countdown}s)</WaitText>
       : <WaitText>Round in progress&hellip;</WaitText>;
   } else if (serverPhase === 'CHALLENGE_JOIN') {
-    if (myChoice === 'in') {
+    if (myOutAndPass) {
+      // This player already committed to pass — no buttons needed
+      content = <WaitText>Auto-passing&hellip;</WaitText>;
+    } else if (myChoice === 'in') {
       content = waitingFor
         ? <WaitText>Waiting for {waitingFor.playerName} to challenge&hellip; ({countdown}s)</WaitText>
         : <WaitText>Waiting for challenges&hellip;</WaitText>;

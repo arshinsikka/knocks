@@ -110,11 +110,14 @@ export interface GameState {
   seenPlayerIds:     string[];
   // Cache of fetched revealed cards from server: targetPlayerId → entry
   revealedCardCache: Record<string, RevealedCardEntry>;
+  // Client-local flag: did I click OUT & PASS this round? Never sent to opponents.
+  myOutAndPass: boolean;
 }
 
 interface GameContextValue extends GameState {
   emitIn:               () => void;
   emitOut:              () => void;
+  emitOutAndPass:       () => void;
   emitJoin:             () => void;
   emitPass:             () => void;
   dismissShowdown:      () => void;
@@ -145,11 +148,12 @@ const DEFAULT: GameState = {
   log:           [],
   seenPlayerIds:     [],
   revealedCardCache: {},
+  myOutAndPass:      false,
 };
 
 const GameContext = createContext<GameContextValue>({
   ...DEFAULT,
-  emitIn:  () => {}, emitOut:  () => {},
+  emitIn:  () => {}, emitOut: () => {}, emitOutAndPass: () => {},
   emitJoin: () => {}, emitPass: () => {},
   dismissShowdown: () => {}, dismissKnock: () => {},
   requestRevealedCards: () => {},
@@ -190,6 +194,7 @@ export function GameProvider({
         // showdownData intentionally NOT cleared here — the overlay manages
         // its own 6-second lifecycle and dismisses independently via dismissShowdown.
         serverPhase: 'IN_OUT', playerChoices: {},
+        myOutAndPass: false,  // reset OUT & PASS flag each new round
       });
       addLog(`Orbit ${d.orbit} · Round ${d.round} — ${d.startingPlayerName} goes first`);
     };
@@ -397,6 +402,7 @@ export function GameProvider({
       ...state,
       emitIn:  useCallback(() => { console.log('[GameContext] emit action_in');   getSocket().emit('action_in');   patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
       emitOut: useCallback(() => { console.log('[GameContext] emit action_out');  getSocket().emit('action_out');  patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
+      emitOutAndPass: useCallback(() => { console.log('[GameContext] emit action_out_and_pass'); getSocket().emit('action_out_and_pass'); patch({ isMyTurn: false, turnPhase: null, myOutAndPass: true }); }, [patch]),
       emitJoin: useCallback(() => { console.log('[GameContext] emit action_join'); getSocket().emit('action_join'); patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
       emitPass: useCallback(() => { console.log('[GameContext] emit action_pass'); getSocket().emit('action_pass'); patch({ isMyTurn: false, turnPhase: null }); }, [patch]),
       dismissShowdown: useCallback(() => patch({ showdownData: null }), [patch]),

@@ -382,12 +382,22 @@ function afterInOut(io: Server, game: GameRoom, roomCode: string) {
     clearTurnTimer(roomCode);
     resolveAndEmit(io, game, roomCode);
   } else if (s.phase === 'CHALLENGE_JOIN') {
-    const actor = game.currentChallengeJoinActor();
-    if (actor) {
-      console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
-      io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
-      io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
-      startTurnTimer(io, game, roomCode, actor, 'challenge_join');
+    // Silently auto-pass any OUT & PASS players before looking for the next actor.
+    // No events are emitted for them — other clients just see the phase resolve faster.
+    game.processAutoPassPlayers();
+    const ns = game.getState();
+    if (ns.phase === 'SHOWDOWN') {
+      // All OUT players were autoPass — skip challenge window, resolve immediately
+      clearTurnTimer(roomCode);
+      resolveAndEmit(io, game, roomCode);
+    } else {
+      const actor = game.currentChallengeJoinActor();
+      if (actor) {
+        console.log(`[turn] ${roomCode} CHALLENGE_JOIN → "${actor.name}" (${actor.socketId})`);
+        io.to(roomCode).emit('waiting_for', { playerName: actor.name, phase: 'challenge_join' });
+        io.to(actor.socketId).emit('your_turn', { phase: 'challenge_join' });
+        startTurnTimer(io, game, roomCode, actor, 'challenge_join');
+      }
     }
   } else {
     // Still IN_OUT
@@ -596,6 +606,27 @@ io.on('connection', (socket: Socket) => {
     if (!ok) { console.log(`[action_out] submitInOut rejected for player="${player.name}"`); return; }
 
     touchRoom(code);
+    io.to(code).emit('player_acted', { playerName: player.name, action: 'out' });
+    afterInOut(io, game, code);
+  });
+
+  // ── GAME: action_out_and_pass ───────────────────────────────────────────────
+  // Player opts out of BOTH the round and the challenge window in one click.
+  // Broadcast to the room as plain 'out' — autoPass is never revealed to others.
+  socket.on('action_out_and_pass', () => {
+    console.log(`[action_out_and_pass] socket=${socket.id}`);
+    const found = findGameBySocket(socket.id);
+    if (!found) { console.log(`[action_out_and_pass] no game found for socket=${socket.id}`); return; }
+    const [code, game, player] = found;
+    console.log(`[action_out_and_pass] player="${player.name}" phase=${game.getState().phase}`);
+    if (game.getState().phase !== 'IN_OUT') return;
+
+    clearTurnTimer(code);
+    const ok = game.submitOutAndPass(player.id);
+    if (!ok) { console.log(`[action_out_and_pass] rejected for player="${player.name}"`); return; }
+
+    touchRoom(code);
+    // Privacy: broadcast identical to regular OUT — opponents never learn about autoPass
     io.to(code).emit('player_acted', { playerName: player.name, action: 'out' });
     afterInOut(io, game, code);
   });

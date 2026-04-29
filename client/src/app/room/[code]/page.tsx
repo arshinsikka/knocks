@@ -181,8 +181,8 @@ function GameBoard({ roomCode, hostId, onLedger }: { roomCode: string; hostId: s
     orbit, round, potTotal, payout, knockTarget,
     players, myCards, selectedCards, myId,
     isMyTurn, turnPhase, serverPhase, waitingFor,
-    showdownData, latestKnock, gameOver, playerChoices,
-    emitIn, emitOut, emitJoin, emitPass,
+    showdownData, latestKnock, gameOver, playerChoices, myOutAndPass,
+    emitIn, emitOut, emitOutAndPass, emitJoin, emitPass,
     dismissShowdown, dismissKnock,
   } = useGame();
 
@@ -285,8 +285,10 @@ function GameBoard({ roomCode, hostId, onLedger }: { roomCode: string; hostId: s
         waitingFor={waitingFor}
         myName={myName}
         playerChoices={playerChoices}
+        myOutAndPass={myOutAndPass}
         emitIn={emitIn}
         emitOut={emitOut}
+        emitOutAndPass={emitOutAndPass}
         emitJoin={emitJoin}
         emitPass={emitPass}
       />
