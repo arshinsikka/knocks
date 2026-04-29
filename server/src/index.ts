@@ -349,6 +349,10 @@ function resolveAndEmit(io: Server, game: GameRoom, roomCode: string) {
       ledger: room ? room.ledger : [],
     });
     activeGames.delete(roomCode);
+    // Allow lobby reconnections (including host socket-ID refresh) while players
+    // view the game-over screen. Without this, room.gameStarted stays true and
+    // rejoin_game silently exits, leaving room.hostId pointing at a stale socket.
+    if (room) room.gameStarted = false;
     return;
   }
 
@@ -824,6 +828,17 @@ io.on('connection', (socket: Socket) => {
     room.gameStarted = false;
     room.lastActivity = Date.now();
 
+    // Ensure the recorded host still has a live socket (it may have changed during
+    // the game-over screen if the host briefly disconnected and reconnected).
+    // If the host socket is gone, promote the first still-connected player.
+    if (!io.sockets.sockets.get(room.hostId)) {
+      const connected = room.players.find((p) => io.sockets.sockets.get(p.id));
+      if (connected) {
+        console.log(`[room] REMATCH ${roomCode}: stale host, promoting "${connected.name}" as new host`);
+        room.hostId = connected.id;
+      }
+    }
+
     io.to(roomCode).emit('rematch_started', {
       players: room.players,
       hostId: room.hostId,
@@ -832,7 +847,9 @@ io.on('connection', (socket: Socket) => {
       challengeLimit: room.challengeLimit,
     });
 
+    const hostName = room.players.find((p) => p.id === room.hostId)?.name ?? 'unknown';
     console.log(`[room] REMATCH started in ${roomCode}`);
+    console.log(`ROOM HEALTH: code=${roomCode}, phase=LOBBY, players=${room.players.length}, host=${hostName}, timers=${turnTimers.has(roomCode) ? 1 : 0}, games=${room.ledger.length}`);
   });
 
   // ── LOBBY: leave_room ────────────────────────────────────────────────────────
